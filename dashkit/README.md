@@ -48,7 +48,7 @@ Open `composer.json` and add the `repositories` block and require the package:
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/YOUR_USERNAME/dashkit"
+            "url": "https://github.com/KarthikGuggilapu/dashkit-dev/tree/6d753cb87322c59a54773007f04895048a0d638c/dashkit"
         }
     ],
     "require": {
