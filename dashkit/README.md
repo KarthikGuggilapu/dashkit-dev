@@ -263,27 +263,6 @@ php artisan config:clear
 
 ---
 
-## Project Structure
-
-```
-packages/dashkit/                  ← Package source (do not edit in vendor/)
-  src/
-    Commands/                      ← Install, upgrade, make-page, make-module, etc.
-    Http/Controllers/              ← Login / logout controller
-    DashkitServiceProvider.php     ← Registers commands, routes, views
-  config/dashkit.php               ← Package default config
-  resources/views/                 ← Layout and auth views
-  routes/web.php                   ← Package route definitions
-
-config/dashkit.php                 ← Your published config (edit this one)
-resources/views/dashkit/
-  pages/                           ← Your generated pages
-  modules/                         ← Your generated modules
-routes/web.php                     ← Your app routes (Dashkit appends to this)
-```
-
----
-
 ## License
 
 MIT
