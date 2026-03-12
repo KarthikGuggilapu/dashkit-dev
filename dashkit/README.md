@@ -47,15 +47,45 @@ Open `composer.json` and add the `repositories` block and require the package:
 {
     "repositories": [
         {
-            "type": "vcs",
-            "url": "https://github.com/KarthikGuggilapu/dashkit-dev.git"
+            "type": "package",
+            "package": {
+                "name": "dashkit/dashkit",
+                "version": "dev-dashkit-dev",
+                "source": {
+                    "type": "git",
+                    "url": "https://github.com/KarthikGuggilapu/dashkit-dev.git",
+                    "reference": "dashkit-dev"
+                },
+                "type": "library",
+                "require": {
+                    "php": "^8.2",
+                    "illuminate/support": "^12.0",
+                    "illuminate/routing": "^12.0",
+                    "illuminate/view": "^12.0",
+                    "illuminate/auth": "^12.0",
+                    "illuminate/console": "^12.0"
+                },
+                "autoload": {
+                    "psr-4": {
+                        "Dashkit\\": "dashkit/src/"
+                    }
+                },
+                "extra": {
+                    "laravel": {
+                        "providers": [
+                            "Dashkit\\DashkitServiceProvider"
+                        ]
+                    }
+                }
+            }
         }
     ],
     "require": {
         "php": "^8.2",
-        "dashkit/dashkit": "dev-dashkit-dev",
-        "laravel/framework": "^12.0"
-    }
+        "laravel/framework": "^12.0",
+        "laravel/tinker": "^2.10.1",
+        "dashkit/dashkit": "dev-dashkit-dev"
+    },
 }
 ```
 
@@ -66,8 +96,17 @@ Open `composer.json` and add the `repositories` block and require the package:
 
 **Step 3 — Install dependencies**
 
+> If composer not installed, install composer with below command
 ```bash
 composer install
+```
+
+> If composer installed already, update the composer to get the package
+```bash
+composer update
+```
+
+```bash
 npm install
 ```
 
