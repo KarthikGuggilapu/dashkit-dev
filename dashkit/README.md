@@ -48,12 +48,12 @@ Open `composer.json` and add the `repositories` block and require the package:
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/KarthikGuggilapu/dashkit-dev/tree/6d753cb87322c59a54773007f04895048a0d638c/dashkit"
+            "url": "https://github.com/KarthikGuggilapu/dashkit-dev.git"
         }
     ],
     "require": {
         "php": "^8.2",
-        "dashkit/dashkit": "dev-main",
+        "dashkit/dashkit": "dev-dashkit-dev",
         "laravel/framework": "^12.0"
     }
 }
