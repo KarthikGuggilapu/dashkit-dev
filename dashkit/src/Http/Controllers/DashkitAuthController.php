@@ -2,6 +2,7 @@
 
 namespace Dashkit\Http\Controllers;
 
+use Dashkit\Models\DashkitAuditLog;
 use Dashkit\Models\DashkitSetting;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
@@ -50,12 +51,28 @@ class DashkitAuthController extends Controller
             ? '/'
             : '/'.$prefix.'/'.ltrim($redirect, '/');
 
+        DashkitAuditLog::record(
+            $request,
+            'auth.login',
+            'user',
+            (string) ($request->user()?->getAuthIdentifier() ?? ''),
+            ['remember' => (bool) $request->boolean('remember')]
+        );
+
         return redirect()->intended($target);
     }
 
     public function logout(Request $request): RedirectResponse
     {
         $guard = (string) config('dashkit.auth.guard', 'web');
+
+        DashkitAuditLog::record(
+            $request,
+            'auth.logout',
+            'user',
+            (string) ($request->user()?->getAuthIdentifier() ?? ''),
+            ['guard' => $guard]
+        );
 
         Auth::guard($guard)->logout();
         $request->session()->invalidate();

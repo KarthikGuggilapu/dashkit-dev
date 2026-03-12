@@ -42,6 +42,7 @@ Route::middleware((array) config('dashkit.route_middleware', ['web']))
             Route::post('/'.$prefix.'/settings/sidebar/remove', [DashkitSettingsController::class, 'removeSidebarItem'])->name('dashkit.settings.sidebar.remove');
             Route::post('/'.$prefix.'/profile', [DashkitProfileController::class, 'updateProfile'])->name('dashkit.profile.update');
             Route::post('/'.$prefix.'/profile/password', [DashkitProfileController::class, 'updatePassword'])->name('dashkit.profile.password.update');
+            Route::post('/'.$prefix.'/profile/avatar/remove', [DashkitProfileController::class, 'removeAvatar'])->name('dashkit.profile.avatar.remove');
             Route::post('/'.$prefix.'/profile/mail-settings', [DashkitProfileController::class, 'updateMailSettings'])->name('dashkit.settings.mail.update');
 
             Route::get('/'.$prefix.'/{page}', [DashboardController::class, 'page'])
