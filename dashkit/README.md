@@ -270,6 +270,7 @@ php artisan package:discover --ansi
 | `php artisan dashkit:install --force` | Overwrite already published files |
 | `php artisan dashkit:upgrade` | Apply latest package changes to an installed app |
 | `php artisan dashkit:upgrade --dry-run` | Preview what upgrade will change |
+| `php artisan dashkit:version` | Show current package version, installed version, and update status |
 | `php artisan dashkit:upgrade --type=crm` | Upgrade and switch preset at the same time |
 | `php artisan dashkit:switch-preset {type}` | Switch preset without a full upgrade |
 | `php artisan dashkit:make-page {name} {title}` | Generate a new dashboard page |

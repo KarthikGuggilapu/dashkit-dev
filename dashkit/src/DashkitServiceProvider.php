@@ -8,12 +8,13 @@ use Dashkit\Commands\DashkitDeletePageCommand;
 use Dashkit\Commands\DashkitInstallCommand;
 use Dashkit\Commands\DashkitMakeModuleCommand;
 use Dashkit\Commands\DashkitMakePageCommand;
+use Dashkit\Commands\DashkitReleaseCheckCommand;
 use Dashkit\Commands\DashkitRenameModuleCommand;
 use Dashkit\Commands\DashkitRenamePageCommand;
-use Dashkit\Commands\DashkitReleaseCheckCommand;
 use Dashkit\Commands\DashkitSwitchPresetCommand;
 use Dashkit\Commands\DashkitUninstallCommand;
 use Dashkit\Commands\DashkitUpgradeCommand;
+use Dashkit\Commands\DashkitVersionCommand;
 use Dashkit\Models\DashkitSetting;
 use Dashkit\Services\WidgetRegistry;
 use Illuminate\Auth\Notifications\ResetPassword;
@@ -29,7 +30,7 @@ class DashkitServiceProvider extends ServiceProvider
         $this->mergeConfigFrom($this->packagePath('config/dashkit.php'), 'dashkit');
 
         $this->app->singleton(WidgetRegistry::class, static function (): WidgetRegistry {
-            return new WidgetRegistry();
+            return new WidgetRegistry;
         });
     }
 
@@ -71,6 +72,7 @@ class DashkitServiceProvider extends ServiceProvider
             DashkitSwitchPresetCommand::class,
             DashkitUninstallCommand::class,
             DashkitUpgradeCommand::class,
+            DashkitVersionCommand::class,
         ]);
     }
 
@@ -129,7 +131,7 @@ class DashkitServiceProvider extends ServiceProvider
 
     private function packagePath(string $path): string
     {
-        return __DIR__ . '/../' . ltrim($path, '/');
+        return __DIR__.'/../'.ltrim($path, '/');
     }
 
     private function applyStoredRuntimeSettings(): void
