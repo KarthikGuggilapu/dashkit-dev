@@ -1,6 +1,6 @@
 {
     "name": "dashkit/dashkit",
-    "version": "1.2.2",
+    "version": "1.2.3",
     "description": "Lightweight dashboard package for Laravel with sidebar, topbar, auth, widgets, and page generator.",
     "type": "library",
     "license": "MIT",
