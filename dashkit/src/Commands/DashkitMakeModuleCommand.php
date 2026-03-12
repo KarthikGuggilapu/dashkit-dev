@@ -193,10 +193,23 @@ class DashkitMakeModuleCommand extends Command
     private function viewTemplate(string $title, string $slug): string
     {
         return "<x-dashkit-layout title=\"{$title}\">\n"
-            . "    <section class=\"dk-panel\">\n"
-            . "        <h2>{$title}</h2>\n"
-            . "        <p>Generated module page for <code>{$slug}</code>.</p>\n"
-            . "    </section>\n"
+            . "    <x-dashkit::ui.card title=\"{$title}\" description=\"Generated module page for {$slug}.\">\n"
+            . "        <x-dashkit::ui.alert tone=\"info\" message=\"Reuse Dashkit UI components for actions, forms, and tables.\" />\n"
+            . "\n"
+            . "        <div class=\"mt-4 flex gap-2\">\n"
+            . "            <x-dashkit::ui.button>New {$title}</x-dashkit::ui.button>\n"
+            . "            <x-dashkit::ui.button variant=\"secondary\">Export</x-dashkit::ui.button>\n"
+            . "        </div>\n"
+            . "\n"
+            . "        <div class=\"mt-4\">\n"
+            . "            <x-dashkit::ui.table :headers=\"['Name', 'Created At']\">\n"
+            . "                <tr>\n"
+            . "                    <td class=\"px-4 py-3 text-slate-700\">Sample Row</td>\n"
+            . "                    <td class=\"px-4 py-3 text-slate-500\">{{ now()->toDateTimeString() }}</td>\n"
+            . "                </tr>\n"
+            . "            </x-dashkit::ui.table>\n"
+            . "        </div>\n"
+            . "    </x-dashkit::ui.card>\n"
             . "</x-dashkit-layout>\n";
     }
 

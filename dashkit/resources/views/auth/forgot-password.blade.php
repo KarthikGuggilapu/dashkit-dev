@@ -7,6 +7,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ config('dashkit.name', 'Dashkit') }} | Forgot Password</title>
     <link rel="stylesheet" href="{{ asset('vendor/dashkit/css/dashkit.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWix+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkR4j8R2f0x1B3p6k9R/+qvOB0fOkHn84q0g==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     <style>
         .dk-auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px;background:#f5f7fb}
         .dk-auth-card{width:100%;max-width:430px;background:#fff;border:1px solid #e7eaf3;border-radius:14px;padding:28px;box-shadow:0 8px 30px rgba(16,24,40,.06)}

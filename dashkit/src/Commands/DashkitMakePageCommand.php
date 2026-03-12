@@ -80,10 +80,14 @@ class DashkitMakePageCommand extends Command
     private function pageTemplate(string $title, string $slug): string
     {
         return "<x-dashkit-layout title=\"{$title}\">\n"
-            . "    <section class=\"dk-panel\">\n"
-            . "        <h2>{$title}</h2>\n"
-            . "        <p>Generated with <code>php artisan dashkit:make-page {$slug}</code>.</p>\n"
-            . "    </section>\n"
+            . "    <x-dashkit::ui.card title=\"{$title}\" description=\"Generated with php artisan dashkit:make-page {$slug}.\">\n"
+            . "        <x-dashkit::ui.alert tone=\"info\" message=\"This page uses Dashkit reusable UI components.\" />\n"
+            . "\n"
+            . "        <div class=\"mt-4 flex flex-wrap gap-2\">\n"
+            . "            <x-dashkit::ui.button>Primary Action</x-dashkit::ui.button>\n"
+            . "            <x-dashkit::ui.button variant=\"secondary\">Secondary Action</x-dashkit::ui.button>\n"
+            . "        </div>\n"
+            . "    </x-dashkit::ui.card>\n"
             . "</x-dashkit-layout>\n";
     }
 

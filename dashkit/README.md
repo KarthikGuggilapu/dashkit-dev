@@ -17,7 +17,8 @@ A lightweight dashboard engine for Laravel. Install a fully working admin dashbo
 7. [Generating Pages & Modules](#generating-pages--modules)
 8. [URL Structure](#url-structure)
 9. [Configuration](#configuration)
-10. [Project Structure](#project-structure)
+10. [UI Components](#ui-components)
+11. [Project Structure](#project-structure)
 
 ---
 
@@ -345,6 +346,57 @@ After editing config, clear the cache:
 ```bash
 php artisan config:clear
 ```
+
+---
+
+## UI Components
+
+Dashkit now includes reusable Blade UI components so generated and package views can share the same design system.
+
+Use these in your views:
+
+- `<x-dashkit::ui.button>` for actions
+- `<x-dashkit::ui.input>` for text/email/password/number fields
+- `<x-dashkit::ui.select>` for dropdowns
+- `<x-dashkit::ui.card>` for page sections
+- `<x-dashkit::ui.alert>` for inline feedback
+- `<x-dashkit::ui.toast>` for temporary notifications
+- `<x-dashkit::ui.table>` for tabular lists
+- `<x-dashkit::ui.modal>` for dialog boxes
+- `<x-dashkit::ui.icon>` for Hero-style SVG icons and Font Awesome icons
+
+Icon examples:
+
+```blade
+<x-dashkit::ui.icon name="mail" class="text-cyan-600" />
+<x-dashkit::ui.icon name="copy" lib="fa" class="text-slate-500" />
+```
+
+Preset-friendly semantic names are supported in `hero` mode as aliases:
+
+- Default: `home`, `reports`, `settings`, `profile`
+- Ecommerce: `products`, `orders`, `customers`, `inventory`
+- CRM: `leads`, `contacts`, `deals`, `activities`
+- Common app: `search`, `bell`, `calendar`, `tasks`, `wallet`, `shield`, `support`, `login`, `logout`
+
+If a `hero` icon name is not in the built-in SVG set, Dashkit automatically falls back to Font Awesome (`fa-solid`) using the same name.
+
+Dashkit layout/auth screens include Font Awesome CDN for quick icon usage.
+
+Example:
+
+```blade
+<x-dashkit::ui.card title="Orders" description="Reusable Dashkit components in action">
+  <x-dashkit::ui.alert tone="info" message="This module uses shared UI primitives." />
+
+  <div class="mt-4 flex gap-2">
+    <x-dashkit::ui.button>Primary</x-dashkit::ui.button>
+    <x-dashkit::ui.button variant="secondary">Secondary</x-dashkit::ui.button>
+  </div>
+</x-dashkit::ui.card>
+```
+
+All newly generated pages/modules now start with these components by default.
 
 ---
 
