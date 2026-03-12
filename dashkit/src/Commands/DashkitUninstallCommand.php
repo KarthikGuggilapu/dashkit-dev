@@ -2,7 +2,9 @@
 
 namespace Dashkit\Commands;
 
+use Dashkit\Models\DashkitAuditLog;
 use Dashkit\Support\ArtifactManifest;
+use Dashkit\Support\CompatibilityGuard;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 
@@ -14,7 +16,12 @@ class DashkitUninstallCommand extends Command
 
     public function handle(Filesystem $files): int
     {
+        if (! CompatibilityGuard::ensure($this)) {
+            return self::FAILURE;
+        }
+
         $state = $this->loadInstallState($files);
+        $packageState = $this->loadPackageState($files);
         $manifest = new ArtifactManifest($files);
         $artifacts = $manifest->all();
         $targets = $this->buildTargets($state, $artifacts);
@@ -33,7 +40,18 @@ class DashkitUninstallCommand extends Command
                 $this->components->warn('Mode selected: --yes (remove all at once, no backup).');
             }
 
-            $this->performReset($files, $artifacts, $manifest, (bool) $this->option('backup'));
+            $this->performReset($files, $packageState, $artifacts, $manifest, (bool) $this->option('backup'), true);
+
+            DashkitAuditLog::record(
+                request(),
+                'package.uninstall.completed',
+                'dashkit',
+                'uninstall',
+                [
+                    'mode' => 'yes',
+                    'backup' => (bool) $this->option('backup'),
+                ]
+            );
 
             return self::SUCCESS;
         }
@@ -56,15 +74,27 @@ class DashkitUninstallCommand extends Command
         $backupPath = $this->backupBeforeReset($files, $targets);
         $this->components->info('Backup created at: '.$backupPath);
 
-        $this->performReset($files, $artifacts, $manifest, true);
+        $this->performReset($files, $packageState, $artifacts, $manifest, true, false);
+
+        DashkitAuditLog::record(
+            request(),
+            'package.uninstall.completed',
+            'dashkit',
+            'uninstall',
+            [
+                'mode' => 'interactive',
+                'backup' => true,
+            ]
+        );
 
         return self::SUCCESS;
     }
 
     /**
-     * @param  array{files?: array<int, string>, routes?: array<int, string>}  $artifacts
+     * @param  array<string, mixed>  $packageState
+     * @param  array{files?: array<int, string>, routes?: array<int, string>, hashes?: array<string, string>}  $artifacts
      */
-    private function performReset(Filesystem $files, array $artifacts, ArtifactManifest $manifest, bool $keepBackups): void
+    private function performReset(Filesystem $files, array $packageState, array $artifacts, ArtifactManifest $manifest, bool $keepBackups, bool $assumeYes): void
     {
         $this->components->info('Uninstalling Dashkit package...');
 
@@ -81,18 +111,19 @@ class DashkitUninstallCommand extends Command
         $this->deleteDirectory($files, public_path('vendor/dashkit'));
 
         $this->line('Step 5/11: Removing generated dashboard pages');
-        $this->deleteDirectory($files, resource_path('views/dashkit/pages'));
-        $this->deleteDirectory($files, resource_path('views/dashkit/modules'));
-        $this->deleteDirectory($files, resource_path('views/dashkit'));
+        $this->removeTrackedPackagePages($files, $packageState, $assumeYes);
 
         $this->line('Step 6/11: Removing Dashkit route include');
         $this->removeRouteInclude($files);
 
         $this->line('Step 7/11: Removing tracked Dashkit generated files/routes');
-        $this->removeTrackedArtifacts($files, $artifacts);
+        $preservedRoutes = $this->removeTrackedArtifacts($files, $artifacts, $assumeYes);
+        $this->removeDirectoryIfEmpty($files, resource_path('views/dashkit/pages'));
+        $this->removeDirectoryIfEmpty($files, resource_path('views/dashkit/modules'));
+        $this->removeDirectoryIfEmpty($files, resource_path('views/dashkit'));
 
         $this->line('Step 8/11: Removing Dashkit default routes from routes/web.php');
-        $this->removeDashkitDefaultRoutes($files);
+        $this->removeDashkitDefaultRoutes($files, $preservedRoutes);
 
         $this->line('Step 9/11: Removing Dashkit bootstrap/provider modifications');
         $this->removeBootstrapChanges($files);
@@ -125,6 +156,22 @@ class DashkitUninstallCommand extends Command
     private function loadInstallState(Filesystem $files): array
     {
         $statePath = storage_path('app/dashkit/install-state.json');
+
+        if (! $files->exists($statePath)) {
+            return [];
+        }
+
+        $decoded = json_decode((string) $files->get($statePath), true);
+
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadPackageState(Filesystem $files): array
+    {
+        $statePath = storage_path('app/dashkit/package-state.json');
 
         if (! $files->exists($statePath)) {
             return [];
@@ -252,6 +299,22 @@ class DashkitUninstallCommand extends Command
         $this->components->info("Deleted: {$path}");
     }
 
+    private function removeDirectoryIfEmpty(Filesystem $files, string $path): void
+    {
+        if (! $files->isDirectory($path)) {
+            return;
+        }
+
+        if ($files->allFiles($path) !== []) {
+            $this->components->warn("Kept non-empty directory: {$path}");
+
+            return;
+        }
+
+        $files->deleteDirectory($path);
+        $this->components->info("Deleted empty directory: {$path}");
+    }
+
     private function clearDirectoryContents(Filesystem $files, string $path): void
     {
         if (! $files->isDirectory($path)) {
@@ -295,7 +358,7 @@ class DashkitUninstallCommand extends Command
         $this->components->info('Removed Dashkit route include from routes/web.php');
     }
 
-    private function removeDashkitDefaultRoutes(Filesystem $files): void
+    private function removeDashkitDefaultRoutes(Filesystem $files, array $preservedRoutes = []): void
     {
         $routesFile = base_path('routes/web.php');
 
@@ -306,19 +369,16 @@ class DashkitUninstallCommand extends Command
         $content = $files->get($routesFile);
         $updated = $content;
 
-        $updated = (string) preg_replace(
-            '/\R?\s*\/\/ Dashkit default page route:\s*(reports|settings|overview)\R[\s\S]*?->name\(\'dashkit\.page\.\1\'\);\R?/m',
-            PHP_EOL,
-            $updated
-        );
+        foreach (['overview', 'reports', 'settings'] as $slug) {
+            $routeName = 'dashkit.page.'.$slug;
 
-        $updated = (string) preg_replace(
-            '/\R?\s*[^\n]*Route::get\([\s\S]*?->name\(\'dashkit\.page\.(?:reports|settings|overview)\'\);\R?/m',
-            PHP_EOL,
-            $updated
-        );
+            if (in_array($routeName, $preservedRoutes, true)) {
+                continue;
+            }
 
-        $updated = (string) preg_replace('/\n?\s*\/\/ Dashkit default page route:.*\R?/m', PHP_EOL, $updated);
+            $updated = $this->removeRouteByName($updated, $routeName);
+        }
+
         $updated = (string) preg_replace('/^\s*$/m', '', $updated);
         $updated = trim($updated).PHP_EOL;
 
@@ -425,10 +485,47 @@ class DashkitUninstallCommand extends Command
     }
 
     /**
-     * @param  array{files?: array<int, string>, routes?: array<int, string>}  $artifacts
+     * @param  array<string, mixed>  $packageState
      */
-    private function removeTrackedArtifacts(Filesystem $files, array $artifacts): void
+    private function removeTrackedPackagePages(Filesystem $files, array $packageState, bool $assumeYes): void
     {
+        /** @var array<string, string> $fileHashes */
+        $fileHashes = isset($packageState['file_hashes']) && is_array($packageState['file_hashes'])
+            ? $packageState['file_hashes']
+            : [];
+
+        foreach ($fileHashes as $relativePath => $storedHash) {
+            if (! str_starts_with($relativePath, 'resources/views/dashkit/pages/')) {
+                continue;
+            }
+
+            $absolutePath = base_path(str_replace('/', DIRECTORY_SEPARATOR, $relativePath));
+
+            if (! $files->isFile($absolutePath)) {
+                continue;
+            }
+
+            if (! $this->shouldDeleteTrackedFile($files, $absolutePath, $storedHash, $assumeYes, 'Package-generated page')) {
+                continue;
+            }
+
+            $files->delete($absolutePath);
+            $this->components->info('Removed package-generated page: '.$absolutePath);
+        }
+    }
+
+    /**
+     * @param  array{files?: array<int, string>, routes?: array<int, string>, hashes?: array<string, string>}  $artifacts
+     * @return array<int, string>
+     */
+    private function removeTrackedArtifacts(Filesystem $files, array $artifacts, bool $assumeYes): array
+    {
+        $preservedRoutes = [];
+        /** @var array<string, string> $hashes */
+        $hashes = isset($artifacts['hashes']) && is_array($artifacts['hashes'])
+            ? $artifacts['hashes']
+            : [];
+
         if (isset($artifacts['files']) && is_array($artifacts['files'])) {
             foreach ($artifacts['files'] as $path) {
                 if (! is_string($path)) {
@@ -436,6 +533,12 @@ class DashkitUninstallCommand extends Command
                 }
 
                 if ($files->isFile($path)) {
+                    $storedHash = $hashes[$path] ?? null;
+
+                    if (! $this->shouldDeleteTrackedFile($files, $path, is_string($storedHash) ? $storedHash : null, $assumeYes, 'Generated file')) {
+                        continue;
+                    }
+
                     $files->delete($path);
                     $this->components->info('Removed tracked file: '.$path);
                 }
@@ -443,12 +546,12 @@ class DashkitUninstallCommand extends Command
         }
 
         if (! isset($artifacts['routes']) || ! is_array($artifacts['routes']) || $artifacts['routes'] === []) {
-            return;
+            return $preservedRoutes;
         }
 
         $routesFile = base_path('routes/web.php');
         if (! $files->exists($routesFile)) {
-            return;
+            return $preservedRoutes;
         }
 
         $content = $files->get($routesFile);
@@ -459,6 +562,12 @@ class DashkitUninstallCommand extends Command
                 continue;
             }
 
+            if (! $this->shouldRemoveTrackedRoute($routeName, $updated, $hashes['route:'.$routeName] ?? null, $assumeYes)) {
+                $preservedRoutes[] = $routeName;
+
+                continue;
+            }
+
             $updated = $this->removeRouteByName($updated, $routeName);
         }
 
@@ -466,6 +575,8 @@ class DashkitUninstallCommand extends Command
             $files->put($routesFile, $updated);
             $this->components->info('Removed tracked Dashkit routes from routes/web.php');
         }
+
+        return $preservedRoutes;
     }
 
     private function removeRouteByName(string $content, string $routeName): string
@@ -473,6 +584,67 @@ class DashkitUninstallCommand extends Command
         $pattern = '/\n?(?:\/\/ Dashkit generated .*\R)?\\\\Illuminate\\\\Support\\\\Facades\\\\Route::get\([\s\S]*?->name\(\''.preg_quote($routeName, '/').'\'\);\R?/m';
 
         return (string) preg_replace($pattern, PHP_EOL, $content);
+    }
+
+    private function shouldDeleteTrackedFile(Filesystem $files, string $path, ?string $storedHash, bool $assumeYes, string $label): bool
+    {
+        if ($assumeYes) {
+            return true;
+        }
+
+        if ($storedHash === null) {
+            $this->components->warn("{$label} has no tracked baseline: {$path}");
+
+            return $this->confirm("Delete {$label}?", false);
+        }
+
+        $currentHash = md5_file($path) ?: '';
+
+        if (hash_equals($storedHash, $currentHash)) {
+            return true;
+        }
+
+        $this->components->warn("{$label} has local changes: {$path}");
+
+        return $this->confirm("Delete {$label} and lose those changes?", false);
+    }
+
+    private function shouldRemoveTrackedRoute(string $routeName, string $content, mixed $storedSignature, bool $assumeYes): bool
+    {
+        $routeBlock = $this->extractRouteByName($content, $routeName);
+
+        if ($routeBlock === null) {
+            return false;
+        }
+
+        if ($assumeYes) {
+            return true;
+        }
+
+        if (! is_string($storedSignature) || $storedSignature === '') {
+            $this->components->warn("Generated route has no tracked baseline: {$routeName}");
+
+            return $this->confirm("Remove route {$routeName}?", false);
+        }
+
+        if (hash_equals($storedSignature, md5($routeBlock))) {
+            return true;
+        }
+
+        $this->components->warn("Generated route has local changes: {$routeName}");
+
+        return $this->confirm("Remove route {$routeName} and lose those changes?", false);
+    }
+
+    private function extractRouteByName(string $content, string $routeName): ?string
+    {
+        $pattern = '/(?:\/\/ Dashkit (?:generated|default) .*\R)?\\\\Illuminate\\\\Support\\\\Facades\\\\Route::get\([\s\S]*?->name\(\''.preg_quote($routeName, '/',).'\'\);\R?/m';
+
+        if (preg_match($pattern, $content, $matches) !== 1) {
+            return null;
+        }
+
+        return $matches[0] ?? null;
     }
 
     private function restoreInstallState(Filesystem $files): void

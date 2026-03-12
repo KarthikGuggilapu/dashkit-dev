@@ -21,6 +21,7 @@
         .dk-link{font-size:13px;color:#4f46e5;text-decoration:none}
         .dk-link:hover{text-decoration:underline}
         .dk-error{padding:10px 12px;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:10px;font-size:13px}
+        .dk-success{padding:10px 12px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:10px;font-size:13px}
         .dk-button{height:44px;border:0;border-radius:10px;background:#111827;color:#fff;font-weight:600;cursor:pointer}
         .dk-button:hover{background:#1f2937}
         .dk-button-full{width:100%}
@@ -31,6 +32,10 @@
     <main class="dk-auth-card" role="main" aria-labelledby="login-heading">
         <h1 id="login-heading" class="dk-auth-title">{{ config('dashkit.name', 'Dashkit') }}</h1>
         <p class="dk-auth-subtitle">Please sign in with your account credentials.</p>
+
+        @if (session('status'))
+            <div class="dk-success" style="margin-bottom:12px">{{ session('status') }}</div>
+        @endif
 
         <form method="POST" action="{{ route('dashkit.login.attempt') }}" class="dk-auth-form">
             @csrf

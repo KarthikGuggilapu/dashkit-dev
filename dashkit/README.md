@@ -2,7 +2,7 @@
 
 A lightweight dashboard engine for Laravel. Install a fully working admin dashboard — login, sidebar, pages, modules — all through simple Artisan commands.
 
-**Laravel 12** · **PHP 8.2+** · **MySQL / PostgreSQL / SQLite**
+**Laravel 10 / 11 / 12** · **PHP 8.1+** · **MySQL / PostgreSQL / SQLite**
 
 ---
 
@@ -23,8 +23,8 @@ A lightweight dashboard engine for Laravel. Install a fully working admin dashbo
 
 ## Requirements
 
-- PHP 8.2 or higher
-- Laravel 12
+- PHP 8.1 or higher
+- Laravel 10, 11, or 12
 - MySQL, PostgreSQL, or SQLite
 - Node.js & npm
 
@@ -58,12 +58,12 @@ Open `composer.json` and add the `repositories` block and require the package:
                 },
                 "type": "library",
                 "require": {
-                    "php": "^8.2",
-                    "illuminate/support": "^12.0",
-                    "illuminate/routing": "^12.0",
-                    "illuminate/view": "^12.0",
-                    "illuminate/auth": "^12.0",
-                    "illuminate/console": "^12.0"
+                    "php": "^8.1",
+                    "illuminate/support": "^10.0|^11.0|^12.0",
+                    "illuminate/routing": "^10.0|^11.0|^12.0",
+                    "illuminate/view": "^10.0|^11.0|^12.0",
+                    "illuminate/auth": "^10.0|^11.0|^12.0",
+                    "illuminate/console": "^10.0|^11.0|^12.0"
                 },
                 "autoload": {
                     "psr-4": {
@@ -81,8 +81,8 @@ Open `composer.json` and add the `repositories` block and require the package:
         }
     ],
     "require": {
-        "php": "^8.2",
-        "laravel/framework": "^12.0",
+        "php": "^8.1",
+        "laravel/framework": "^10.0|^11.0|^12.0",
         "laravel/tinker": "^2.10.1",
         "dashkit/dashkit": "dev-dashkit-dev"
     },
@@ -213,7 +213,9 @@ composer run dashkit-update
 
 This does two things in one step:
 1. Pulls the latest package code from GitHub (`composer update dashkit/dashkit`)
-2. Applies any config, view, or migration changes (`php artisan dashkit:upgrade`)
+2. Applies config and asset updates — **your customised views are never overwritten** (`php artisan dashkit:upgrade`)
+
+> **Want a full UI reset?** Run `php artisan dashkit:upgrade --force` manually. This will overwrite your published views with the latest package versions.
 
 ---
 

@@ -2,7 +2,9 @@
 
 namespace Dashkit\Commands;
 
+use Dashkit\Models\DashkitAuditLog;
 use Dashkit\Support\ArtifactManifest;
+use Dashkit\Support\CompatibilityGuard;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
@@ -17,6 +19,10 @@ class DashkitMakePageCommand extends Command
 
     public function handle(Filesystem $files): int
     {
+        if (! CompatibilityGuard::ensure($this)) {
+            return self::FAILURE;
+        }
+
         $this->manifest = new ArtifactManifest($files);
 
         $rawName = (string) $this->argument('name');
@@ -48,11 +54,25 @@ class DashkitMakePageCommand extends Command
         $files->ensureDirectoryExists($targetDirectory);
         $files->put($targetPath, $this->pageTemplate($title, $slug));
         $this->manifest->addFile($targetPath);
+        $this->manifest->recordHash($targetPath);
         $this->appendAppRoute($files, $slug);
         $this->appendSidebarItem($files, $title, 'dashkit.page.'.$slug);
 
         $this->components->info("Created page: {$targetPath}");
         $this->line('Route name: dashkit.page.' . $slug);
+
+        DashkitAuditLog::record(
+            request(),
+            'generator.page.created',
+            'dashkit_page',
+            $slug,
+            [
+                'slug' => $slug,
+                'title' => $title,
+                'path' => str_replace('\\', '/', $targetPath),
+                'force' => $force,
+            ]
+        );
 
         return self::SUCCESS;
     }
@@ -106,7 +126,7 @@ class DashkitMakePageCommand extends Command
             . "    ->name('{$routeName}');" . PHP_EOL;
 
         $files->append($routesFile, $snippet);
-        $this->manifest->addRoute($routeName);
+        $this->manifest->addRoute($routeName, md5($snippet));
         $this->components->info("Added route to routes/web.php: {$routeName}");
     }
 

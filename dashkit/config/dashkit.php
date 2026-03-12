@@ -25,9 +25,15 @@ return [
     'auth' => [
         'enabled' => (bool) env('DASHKIT_AUTH_ENABLED', true),
         'guard' => env('DASHKIT_AUTH_GUARD', 'web'),
+        'password_broker' => env('DASHKIT_AUTH_PASSWORD_BROKER', env('AUTH_PASSWORD_BROKER', 'users')),
         'login_route' => env('DASHKIT_LOGIN_PATH', 'login'),
         'logout_route' => env('DASHKIT_LOGOUT_PATH', 'logout'),
         'redirect_after_login' => env('DASHKIT_REDIRECT_AFTER_LOGIN', '/'),
+    ],
+
+    'mail' => [
+        'from_address' => env('DASHKIT_MAIL_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', 'hello@example.com')),
+        'from_name' => env('DASHKIT_MAIL_FROM_NAME', env('MAIL_FROM_NAME', 'Dashkit')),
     ],
 
     /*
@@ -38,7 +44,7 @@ return [
     'sidebar' => [
         ['title' => 'Overview', 'route' => 'dashkit.home'],
         ['title' => 'Reports', 'route' => 'dashkit.page.reports'],
-        ['title' => 'Settings', 'route' => 'dashkit.page.settings'],
+        ['title' => 'Settings', 'route' => 'dashkit.settings'],
     ],
 
     'topbar' => [

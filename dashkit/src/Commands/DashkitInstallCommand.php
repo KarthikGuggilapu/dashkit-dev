@@ -2,7 +2,10 @@
 
 namespace Dashkit\Commands;
 
+use Dashkit\Models\DashkitAuditLog;
+use Dashkit\Models\DashkitSetting;
 use Dashkit\Support\ArtifactManifest;
+use Dashkit\Support\CompatibilityGuard;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
@@ -28,6 +31,10 @@ class DashkitInstallCommand extends Command
 
     public function handle(Filesystem $files): int
     {
+        if (! CompatibilityGuard::ensure($this)) {
+            return self::FAILURE;
+        }
+
         $this->files = $files;
         $this->manifest = new ArtifactManifest($files);
         $this->installState = ['files' => [], 'created_at' => now()->toDateTimeString()];
@@ -108,7 +115,36 @@ class DashkitInstallCommand extends Command
         $this->components->info('Use the seeded admin credentials to login. You can update them later in the profile page.');
         $this->components->info('To get future Dashkit updates, run: composer run dashkit-update');
 
+        DashkitAuditLog::record(
+            request(),
+            'package.install.completed',
+            'dashkit',
+            'install',
+            [
+                'version' => (string) (($this->readPackageState()['installed_version'] ?? '0.0.0')),
+                'db_connection' => (string) ($setup['DB_CONNECTION'] ?? ''),
+                'install_preset' => (string) ($setup['DASHKIT_INSTALL_PRESET'] ?? 'default'),
+                'mail_mailer' => (string) ($setup['MAIL_MAILER'] ?? ''),
+            ]
+        );
+
         return self::SUCCESS;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function readPackageState(): array
+    {
+        $statePath = storage_path('app/dashkit/package-state.json');
+
+        if (! $this->files->exists($statePath)) {
+            return [];
+        }
+
+        $decoded = json_decode((string) $this->files->get($statePath), true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     /**
@@ -138,6 +174,15 @@ class DashkitInstallCommand extends Command
         $adminName = (string) $this->ask('Default admin name', (string) env('DASHKIT_DEFAULT_ADMIN_NAME', 'Dashkit Admin'));
         $adminEmail = (string) $this->ask('Default admin email', (string) env('DASHKIT_DEFAULT_ADMIN_EMAIL', 'admin@example.com'));
         $adminPassword = (string) ($this->secret('Default admin password') ?: 'password');
+
+        $mailMailer = (string) $this->ask('Mail driver (smtp/log/mailgun/etc)', (string) env('MAIL_MAILER', 'smtp'));
+        $mailHost = (string) $this->ask('Mail host', (string) env('MAIL_HOST', '127.0.0.1'));
+        $mailPort = (string) $this->ask('Mail port', (string) env('MAIL_PORT', '2525'));
+        $mailUsername = (string) $this->ask('Mail username', (string) env('MAIL_USERNAME', ''));
+        $mailPassword = (string) ($this->secret('Mail password (leave empty to keep current)') ?: (string) env('MAIL_PASSWORD', ''));
+        $mailEncryption = (string) $this->ask('Mail encryption (tls/ssl/null)', (string) env('MAIL_ENCRYPTION', 'tls'));
+        $mailFromAddress = (string) $this->ask('Mail from address', (string) env('MAIL_FROM_ADDRESS', 'hello@example.com'));
+        $mailFromName = (string) $this->ask('Mail from name', (string) env('MAIL_FROM_NAME', $appName));
         $preset = $this->resolveInstallPreset();
 
         return [
@@ -151,6 +196,16 @@ class DashkitInstallCommand extends Command
             'DASHKIT_DEFAULT_ADMIN_NAME' => $adminName,
             'DASHKIT_DEFAULT_ADMIN_EMAIL' => $adminEmail,
             'DASHKIT_DEFAULT_ADMIN_PASSWORD' => $adminPassword,
+            'MAIL_MAILER' => $mailMailer,
+            'MAIL_HOST' => $mailHost,
+            'MAIL_PORT' => $mailPort,
+            'MAIL_USERNAME' => $mailUsername,
+            'MAIL_PASSWORD' => $mailPassword,
+            'MAIL_ENCRYPTION' => $mailEncryption,
+            'MAIL_FROM_ADDRESS' => $mailFromAddress,
+            'MAIL_FROM_NAME' => $mailFromName,
+            'DASHKIT_MAIL_FROM_ADDRESS' => $mailFromAddress,
+            'DASHKIT_MAIL_FROM_NAME' => $mailFromName,
             'DASHKIT_INSTALL_PRESET' => $preset,
         ];
     }
@@ -348,7 +403,7 @@ class DashkitInstallCommand extends Command
         $content = $this->files->get($routesFile);
 
         foreach ($slugs as $slug) {
-            if ($slug === 'profile') {
+            if ($slug === 'profile' || $slug === 'settings') {
                 continue;
             }
 
@@ -369,7 +424,7 @@ class DashkitInstallCommand extends Command
 
             $this->backupFileBeforeWrite($routesFile);
             $this->files->append($routesFile, $snippet);
-            $this->manifest->addRoute($routeName);
+            $this->manifest->addRoute($routeName, md5($snippet));
         }
 
         $this->components->info('Ensured default page routes exist in routes/web.php');
@@ -384,7 +439,6 @@ class DashkitInstallCommand extends Command
             'overview' => 'Overview',
             'profile' => 'Profile',
             'reports' => 'Reports',
-            'settings' => 'Settings',
         ];
 
         if ($preset === 'ecommerce') {
@@ -396,7 +450,6 @@ class DashkitInstallCommand extends Command
                 'customers' => 'Customers',
                 'inventory' => 'Inventory',
                 'reports' => 'Reports',
-                'settings' => 'Settings',
             ];
         }
 
@@ -409,7 +462,6 @@ class DashkitInstallCommand extends Command
                 'deals' => 'Deals',
                 'activities' => 'Activities',
                 'reports' => 'Reports',
-                'settings' => 'Settings',
             ];
         }
 
@@ -434,7 +486,7 @@ class DashkitInstallCommand extends Command
                 "        ['title' => 'Customers', 'route' => 'dashkit.page.customers'],",
                 "        ['title' => 'Inventory', 'route' => 'dashkit.page.inventory'],",
                 "        ['title' => 'Reports', 'route' => 'dashkit.page.reports'],",
-                "        ['title' => 'Settings', 'route' => 'dashkit.page.settings'],",
+                "        ['title' => 'Settings', 'route' => 'dashkit.settings'],",
             ],
             'crm' => [
                 "        ['title' => 'Overview', 'route' => 'dashkit.home'],",
@@ -443,12 +495,12 @@ class DashkitInstallCommand extends Command
                 "        ['title' => 'Deals', 'route' => 'dashkit.page.deals'],",
                 "        ['title' => 'Activities', 'route' => 'dashkit.page.activities'],",
                 "        ['title' => 'Reports', 'route' => 'dashkit.page.reports'],",
-                "        ['title' => 'Settings', 'route' => 'dashkit.page.settings'],",
+                "        ['title' => 'Settings', 'route' => 'dashkit.settings'],",
             ],
             default => [
                 "        ['title' => 'Overview', 'route' => 'dashkit.home'],",
                 "        ['title' => 'Reports', 'route' => 'dashkit.page.reports'],",
-                "        ['title' => 'Settings', 'route' => 'dashkit.page.settings'],",
+                "        ['title' => 'Settings', 'route' => 'dashkit.settings'],",
             ],
         };
 
@@ -957,14 +1009,35 @@ BLADE;
         return <<<'BLADE'
 <x-dashkit-layout title="Profile">
     @php
-        $user = auth()->user();
+        $user = $user ?? auth()->user();
+        $mailSettings = $mailSettings ?? [
+            'mailer' => env('MAIL_MAILER', 'smtp'),
+            'host' => env('MAIL_HOST', '127.0.0.1'),
+            'port' => env('MAIL_PORT', '2525'),
+            'username' => env('MAIL_USERNAME', ''),
+            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
+            'from_address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
+            'from_name' => env('MAIL_FROM_NAME', config('app.name', 'Dashkit')),
+        ];
         $name = (string) ($user?->name ?? 'Dashkit User');
         $email = (string) ($user?->email ?? 'not-available@example.com');
         $initials = collect(explode(' ', trim($name)))->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->implode('');
         $initials = $initials !== '' ? $initials : 'DU';
     @endphp
 
-    <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+    @if (session('status') === 'profile-updated')
+        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Profile updated successfully.</div>
+    @endif
+
+    @if (session('status') === 'password-updated')
+        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Password updated successfully.</div>
+    @endif
+
+    @if (session('status') === 'mail-settings-updated')
+        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Mail settings saved.</div>
+    @endif
+
+    <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <div class="flex flex-wrap items-center gap-4">
             <div class="grid h-16 w-16 place-content-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-xl font-bold text-white">{{ $initials }}</div>
             <div>
@@ -987,6 +1060,106 @@ BLADE;
                 <p class="mt-1 text-sm font-semibold text-emerald-700">Active</p>
             </article>
         </div>
+    </section>
+
+    <section class="grid gap-6 lg:grid-cols-2">
+        <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 class="mb-4 text-lg font-bold text-slate-900">Edit Profile</h3>
+            <form method="POST" action="{{ route('dashkit.profile.update') }}" class="space-y-4">
+                @csrf
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="profile_name">Name</label>
+                    <input id="profile_name" type="text" name="name" value="{{ old('name', $name) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                    @error('name')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="profile_email">Email</label>
+                    <input id="profile_email" type="email" name="email" value="{{ old('email', $email) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                    @error('email')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700">Save Profile</button>
+            </form>
+        </article>
+
+        <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h3 class="mb-4 text-lg font-bold text-slate-900">Change Password</h3>
+            <form method="POST" action="{{ route('dashkit.profile.password.update') }}" class="space-y-4">
+                @csrf
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="current_password">Current Password</label>
+                    <input id="current_password" type="password" name="current_password" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                    @error('current_password')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="new_password">New Password</label>
+                    <input id="new_password" type="password" name="password" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                    @error('password')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="new_password_confirmation">Confirm Password</label>
+                    <input id="new_password_confirmation" type="password" name="password_confirmation" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </div>
+
+                <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700">Update Password</button>
+            </form>
+        </article>
+
+        <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
+            <h3 class="mb-4 text-lg font-bold text-slate-900">Mail Settings</h3>
+            <form method="POST" action="{{ route('dashkit.settings.mail.update') }}" class="grid gap-4 md:grid-cols-2">
+                @csrf
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_mailer">Mailer</label>
+                    <input id="mail_mailer" type="text" name="mail_mailer" value="{{ old('mail_mailer', (string) ($mailSettings['mailer'] ?? 'smtp')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_host">Host</label>
+                    <input id="mail_host" type="text" name="mail_host" value="{{ old('mail_host', (string) ($mailSettings['host'] ?? '127.0.0.1')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_port">Port</label>
+                    <input id="mail_port" type="number" name="mail_port" value="{{ old('mail_port', (string) ($mailSettings['port'] ?? '2525')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_username">Username</label>
+                    <input id="mail_username" type="text" name="mail_username" value="{{ old('mail_username', (string) ($mailSettings['username'] ?? '')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_password">Password (leave blank to keep current)</label>
+                    <input id="mail_password" type="password" name="mail_password" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_encryption">Encryption</label>
+                    <input id="mail_encryption" type="text" name="mail_encryption" value="{{ old('mail_encryption', (string) ($mailSettings['encryption'] ?? 'tls')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_from_address">From Address</label>
+                    <input id="mail_from_address" type="email" name="mail_from_address" value="{{ old('mail_from_address', (string) ($mailSettings['from_address'] ?? 'hello@example.com')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </div>
+
+                <div>
+                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_from_name">From Name</label>
+                    <input id="mail_from_name" type="text" name="mail_from_name" value="{{ old('mail_from_name', (string) ($mailSettings['from_name'] ?? config('app.name', 'Dashkit'))) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                </div>
+
+                <div class="md:col-span-2">
+                    <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">Save Mail Settings</button>
+                </div>
+            </form>
+        </article>
     </section>
 </x-dashkit-layout>
 BLADE;
@@ -1061,6 +1234,8 @@ BLADE;
         if (! $this->runMigrationsAndSeedSafely($setup)) {
             return false;
         }
+
+        $this->persistDashkitCoreSettings($setup);
 
         $this->line('Default admin email: '.$setup['DASHKIT_DEFAULT_ADMIN_EMAIL']);
         $this->line('Default admin password: '.$setup['DASHKIT_DEFAULT_ADMIN_PASSWORD']);
@@ -1300,17 +1475,29 @@ PHP;
      */
     private function applyRuntimeDatabaseConfiguration(array $setup): void
     {
+        $connection = $setup['DB_CONNECTION'];
+
+        config(['app.name' => $setup['APP_NAME']]);
+        config(['database.default' => $connection]);
+
+        if ($connection === 'sqlite') {
+            config([
+                'database.connections.sqlite.database' => $this->normalizeSqliteDatabasePath($setup['DB_DATABASE']),
+            ]);
+            DB::purge('sqlite');
+
+            return;
+        }
+
         config([
-            'app.name' => $setup['APP_NAME'],
-            'database.default' => $setup['DB_CONNECTION'],
-            'database.connections.'.$setup['DB_CONNECTION'].'.host' => $setup['DB_HOST'],
-            'database.connections.'.$setup['DB_CONNECTION'].'.port' => $setup['DB_PORT'],
-            'database.connections.'.$setup['DB_CONNECTION'].'.database' => $setup['DB_DATABASE'],
-            'database.connections.'.$setup['DB_CONNECTION'].'.username' => $setup['DB_USERNAME'],
-            'database.connections.'.$setup['DB_CONNECTION'].'.password' => $setup['DB_PASSWORD'],
+            'database.connections.'.$connection.'.host' => $setup['DB_HOST'],
+            'database.connections.'.$connection.'.port' => $setup['DB_PORT'],
+            'database.connections.'.$connection.'.database' => $setup['DB_DATABASE'],
+            'database.connections.'.$connection.'.username' => $setup['DB_USERNAME'],
+            'database.connections.'.$connection.'.password' => $setup['DB_PASSWORD'],
         ]);
 
-        DB::purge($setup['DB_CONNECTION']);
+        DB::purge($connection);
     }
 
     /**
@@ -1345,6 +1532,8 @@ PHP;
             if ($connection === 'mysql') {
                 $pdo = new PDO("mysql:host={$host};port={$port};charset=utf8mb4", $user, $pass, [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::ATTR_TIMEOUT => 5,
                 ]);
                 $pdo->exec('CREATE DATABASE IF NOT EXISTS `'.str_replace('`', '``', $dbName).'` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
                 $this->components->info('Verified MySQL database exists: '.$dbName);
@@ -1353,6 +1542,8 @@ PHP;
             if ($connection === 'pgsql') {
                 $pdo = new PDO("pgsql:host={$host};port={$port};dbname=postgres", $user, $pass, [
                     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                    PDO::ATTR_EMULATE_PREPARES => false,
+                    PDO::ATTR_TIMEOUT => 5,
                 ]);
                 $safeDb = str_replace('"', '""', $dbName);
                 $existsStmt = $pdo->prepare('SELECT 1 FROM pg_database WHERE datname = :name');
@@ -1381,13 +1572,59 @@ PHP;
     {
         try {
             DB::purge($setup['DB_CONNECTION']);
-            DB::connection($setup['DB_CONNECTION'])->getPdo();
+            $connection = DB::connection($setup['DB_CONNECTION']);
+            $connection->getPdo();
+            $connection->select('SELECT 1');
+
+            DB::disconnect($setup['DB_CONNECTION']);
 
             return true;
         } catch (Throwable $e) {
             $this->components->error('Connection test failed: '.$e->getMessage());
 
             return false;
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $setup
+     */
+    private function persistDashkitCoreSettings(array $setup): void
+    {
+        try {
+            DashkitSetting::put('app_name', $setup['APP_NAME'], 'app', 'string');
+            DashkitSetting::put('app_env', (string) env('APP_ENV', 'production'), 'app', 'string');
+            DashkitSetting::put('app_url', (string) env('APP_URL', ''), 'app', 'string');
+            DashkitSetting::put('app_timezone', (string) config('app.timezone', 'UTC'), 'app', 'string');
+            DashkitSetting::put('app_locale', (string) config('app.locale', 'en'), 'app', 'string');
+
+            DashkitSetting::put('db_connection', $setup['DB_CONNECTION'], 'database', 'string');
+            DashkitSetting::put('db_host', (string) ($setup['DB_HOST'] ?? ''), 'database', 'string');
+            DashkitSetting::put('db_port', (string) ($setup['DB_PORT'] ?? ''), 'database', 'string');
+            DashkitSetting::put('db_database', $setup['DB_DATABASE'], 'database', 'string');
+            DashkitSetting::put('db_username', (string) ($setup['DB_USERNAME'] ?? ''), 'database', 'string');
+            // Intentionally do not store DB password in dashkit_settings.
+
+            DashkitSetting::put('mail_mailer', $setup['MAIL_MAILER'], 'mail', 'string');
+            DashkitSetting::put('mail_host', $setup['MAIL_HOST'], 'mail', 'string');
+            DashkitSetting::put('mail_port', $setup['MAIL_PORT'], 'mail', 'int');
+            DashkitSetting::put('mail_username', $setup['MAIL_USERNAME'], 'mail', 'string');
+            DashkitSetting::put('mail_encryption', $setup['MAIL_ENCRYPTION'], 'mail', 'string');
+            DashkitSetting::put('mail_from_address', $setup['MAIL_FROM_ADDRESS'], 'mail', 'string');
+            DashkitSetting::put('mail_from_name', $setup['MAIL_FROM_NAME'], 'mail', 'string');
+
+            if ((string) $setup['MAIL_PASSWORD'] !== '') {
+                DashkitSetting::putSecret('mail_password', $setup['MAIL_PASSWORD'], 'mail');
+            }
+
+            DashkitSetting::put('auth_guard', (string) config('dashkit.auth.guard', 'web'), 'auth', 'string');
+            DashkitSetting::put('auth_password_broker', (string) config('dashkit.auth.password_broker', 'users'), 'auth', 'string');
+            DashkitSetting::put('route_prefix', (string) config('dashkit.route_prefix', 'dashboard'), 'routing', 'string');
+            DashkitSetting::put('install_preset', (string) ($setup['DASHKIT_INSTALL_PRESET'] ?? 'default'), 'app', 'string');
+
+            $this->components->info('Stored Dashkit core app/mail/database metadata in dashkit_settings.');
+        } catch (Throwable $e) {
+            $this->components->warn('Could not persist Dashkit core settings to DB: '.$e->getMessage());
         }
     }
 
@@ -1462,10 +1699,119 @@ PHP;
         $state = [
             'installed_version' => $version,
             'installed_at' => now()->toDateTimeString(),
+            'package_fingerprint' => $this->currentPackageFingerprint(),
+            'view_hashes' => $this->buildViewHashes(),
+            'file_hashes' => $this->buildManagedFileHashes(),
         ];
 
         $this->files->put($statePath, json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
         $this->components->info('Recorded Dashkit package version state.');
+    }
+
+    private function currentPackageFingerprint(): string
+    {
+        $packageRoot = dirname(__DIR__, 2);
+        $paths = [
+            $packageRoot.DIRECTORY_SEPARATOR.'composer.json',
+            $packageRoot.DIRECTORY_SEPARATOR.'config',
+            $packageRoot.DIRECTORY_SEPARATOR.'resources',
+            $packageRoot.DIRECTORY_SEPARATOR.'routes',
+            $packageRoot.DIRECTORY_SEPARATOR.'src',
+        ];
+
+        $entries = [];
+
+        foreach ($paths as $path) {
+            if ($this->files->isFile($path)) {
+                $relativePath = str_replace($packageRoot.DIRECTORY_SEPARATOR, '', $path);
+                $entries[] = str_replace('\\', '/', $relativePath).':'.(md5_file($path) ?: '');
+                continue;
+            }
+
+            if (! $this->files->isDirectory($path)) {
+                continue;
+            }
+
+            /** @var \SplFileInfo[] $allFiles */
+            $allFiles = $this->files->allFiles($path);
+
+            foreach ($allFiles as $file) {
+                $relativePath = str_replace($packageRoot.DIRECTORY_SEPARATOR, '', $file->getPathname());
+                $entries[] = str_replace('\\', '/', $relativePath).':'.(md5_file($file->getPathname()) ?: '');
+            }
+        }
+
+        sort($entries);
+
+        return md5(implode('|', $entries));
+    }
+
+    /**
+     * Build md5 hashes of every package source view file.
+     * These represent the "original baseline" the developer received.
+     *
+     * @return array<string, string>
+     */
+    private function buildViewHashes(): array
+    {
+        $sourceDir = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'resources'.DIRECTORY_SEPARATOR.'views';
+        $hashes = [];
+
+        if (! $this->files->isDirectory($sourceDir)) {
+            return $hashes;
+        }
+
+        /** @var \SplFileInfo[] $allFiles */
+        $allFiles = $this->files->allFiles($sourceDir);
+
+        foreach ($allFiles as $file) {
+            $relativePath = str_replace($sourceDir.DIRECTORY_SEPARATOR, '', $file->getPathname());
+            $relativePath = str_replace('\\', '/', $relativePath);
+            $hashes[$relativePath] = md5_file($file->getPathname()) ?: '';
+        }
+
+        return $hashes;
+    }
+
+    /**
+     * Snapshot md5 hashes of all app-level files that Dashkit created or modified during install.
+     * Stored under relative keys so any developer's machine maps correctly.
+     *
+     * Covered:
+     *   config/dashkit.php           — published config (may be tweaked by developer)
+     *   routes/web.php               — Dashkit appends a require include
+     *   bootstrap/app.php            — Dashkit adds guest redirect middleware
+     *   resources/views/dashkit/pages/**  — generated preset pages
+     *
+     * @return array<string, string>
+     */
+    private function buildManagedFileHashes(): array
+    {
+        $hashes = [];
+
+        $singleFiles = [
+            'config/dashkit.php'  => config_path('dashkit.php'),
+            'routes/web.php'      => base_path('routes/web.php'),
+            'bootstrap/app.php'   => base_path('bootstrap/app.php'),
+        ];
+
+        foreach ($singleFiles as $key => $absPath) {
+            if ($this->files->exists($absPath)) {
+                $hashes[$key] = md5_file($absPath) ?: '';
+            }
+        }
+
+        $pagesDir = resource_path('views/dashkit/pages');
+        if ($this->files->isDirectory($pagesDir)) {
+            /** @var \SplFileInfo[] $pageFiles */
+            $pageFiles = $this->files->allFiles($pagesDir);
+            foreach ($pageFiles as $file) {
+                $rel = 'resources/views/dashkit/pages/'.str_replace('\\', '/', $file->getRelativePathname());
+                $hashes[$rel] = md5_file($file->getPathname()) ?: '';
+            }
+        }
+
+        return $hashes;
     }
 
     /** @return array{completed: array<int, string>, setup?: array<string, string>} */

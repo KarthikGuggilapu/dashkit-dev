@@ -2,7 +2,9 @@
 
 namespace Dashkit\Commands;
 
+use Dashkit\Models\DashkitAuditLog;
 use Dashkit\Support\ArtifactManifest;
+use Dashkit\Support\CompatibilityGuard;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Str;
@@ -17,6 +19,10 @@ class DashkitMakeModuleCommand extends Command
 
     public function handle(Filesystem $files): int
     {
+        if (! CompatibilityGuard::ensure($this)) {
+            return self::FAILURE;
+        }
+
         $this->manifest = new ArtifactManifest($files);
 
         $name = (string) $this->argument('name');
@@ -53,6 +59,23 @@ class DashkitMakeModuleCommand extends Command
         $this->line('Module URL: /' . trim((string) config('dashkit.route_prefix', 'dashboard'), '/') . '/' . $slug);
         $this->line('Route name: ' . $routeName);
 
+        DashkitAuditLog::record(
+            request(),
+            'generator.module.created',
+            'dashkit_module',
+            $slug,
+            [
+                'slug' => $slug,
+                'title' => $title,
+                'model_path' => str_replace('\\', '/', $modelPath),
+                'controller_path' => str_replace('\\', '/', $controllerPath),
+                'view_path' => str_replace('\\', '/', $viewPath),
+                'migration_path' => str_replace('\\', '/', $migrationPath),
+                'route_name' => $routeName,
+                'force' => $force,
+            ]
+        );
+
         return self::SUCCESS;
     }
 
@@ -71,6 +94,7 @@ class DashkitMakeModuleCommand extends Command
 
         $files->put($path, $content);
         $this->manifest->addFile($path);
+        $this->manifest->recordHash($path);
         $this->components->info("{$label} created: {$path}");
     }
 
@@ -118,7 +142,7 @@ class DashkitMakeModuleCommand extends Command
             . "    ->name('{$routeName}');" . PHP_EOL;
 
         $files->append($routesFile, $snippet);
-        $this->manifest->addRoute($routeName);
+        $this->manifest->addRoute($routeName, md5($snippet));
         $this->components->info("Route added to routes/web.php: {$routeName}");
 
         return $routeName;

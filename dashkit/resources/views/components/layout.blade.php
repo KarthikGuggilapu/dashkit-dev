@@ -64,7 +64,9 @@
 
             <div class="flex items-center gap-3">
                 @if(config('dashkit.topbar.show_search'))
-                    <input class="w-52 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none" type="search" placeholder="Search dashboard">
+                    <form method="GET" action="{{ route('dashkit.search') }}">
+                        <input class="w-52 rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-teal-600 focus:outline-none" type="search" name="q" value="{{ (string) request('q', '') }}" placeholder="Search dashboard">
+                    </form>
                 @endif
 
                 @if(config('dashkit.auth.enabled') && config('dashkit.topbar.user_menu'))
