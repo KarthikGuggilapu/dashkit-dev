@@ -2,16 +2,19 @@
 
 namespace Dashkit\Http\Controllers;
 
+use Dashkit\Models\DashkitSetting;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
-use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
+use Throwable;
 
 class DashkitAuthController extends Controller
 {
@@ -63,20 +66,36 @@ class DashkitAuthController extends Controller
         return redirect($loginPath);
     }
 
-    public function showForgotPassword(): View
+    public function showForgotPassword(): View|RedirectResponse
     {
+        if (! $this->isPasswordResetMailConfigured()) {
+            return $this->redirectForgotPasswordDisabled();
+        }
+
         return view('dashkit::auth.forgot-password');
     }
 
     public function sendPasswordResetLink(Request $request): RedirectResponse
     {
+        if (! $this->isPasswordResetMailConfigured()) {
+            return $this->redirectForgotPasswordDisabled();
+        }
+
         $request->validate([
             'email' => ['required', 'email'],
         ]);
 
-        $status = Password::broker($this->passwordBroker())->sendResetLink(
-            $request->only('email')
-        );
+        try {
+            $status = Password::broker($this->passwordBroker())->sendResetLink(
+                $request->only('email')
+            );
+        } catch (Throwable) {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors([
+                    'email' => 'Unable to send reset link right now. Please update your email in Dashboard Settings page and try again.',
+                ]);
+        }
 
         if ($status === Password::RESET_LINK_SENT) {
             return back()->with('status', __($status));
@@ -127,5 +146,48 @@ class DashkitAuthController extends Controller
     private function passwordBroker(): string
     {
         return (string) config('dashkit.auth.password_broker', config('auth.defaults.passwords', 'users'));
+    }
+
+    private function redirectForgotPasswordDisabled(): RedirectResponse
+    {
+        return redirect()
+            ->route('dashkit.login')
+            ->with('dashkit_toast_error', 'Please update your email in Dashboard Settings page.');
+    }
+
+    private function isPasswordResetMailConfigured(): bool
+    {
+        $mailer = strtolower(trim((string) $this->mailSetting('mail_mailer', (string) config('mail.default', ''))));
+        $fromAddress = trim((string) $this->mailSetting('mail_from_address', (string) config('mail.from.address', '')));
+
+        if ($mailer === '' || in_array($mailer, ['log', 'array'], true)) {
+            return false;
+        }
+
+        if ($fromAddress === '' || ! filter_var($fromAddress, FILTER_VALIDATE_EMAIL)) {
+            return false;
+        }
+
+        if ($mailer === 'smtp') {
+            $host = trim((string) $this->mailSetting('mail_host', (string) config('mail.mailers.smtp.host', '')));
+            $port = (int) $this->mailSetting('mail_port', (string) config('mail.mailers.smtp.port', '0'));
+
+            return $host !== '' && $port > 0;
+        }
+
+        return true;
+    }
+
+    private function mailSetting(string $key, string $fallback): string
+    {
+        try {
+            if (! Schema::hasTable('dashkit_settings')) {
+                return $fallback;
+            }
+
+            return DashkitSetting::get($key, $fallback);
+        } catch (Throwable) {
+            return $fallback;
+        }
     }
 }

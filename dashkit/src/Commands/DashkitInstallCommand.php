@@ -175,14 +175,16 @@ class DashkitInstallCommand extends Command
         $adminEmail = (string) $this->ask('Default admin email', (string) env('DASHKIT_DEFAULT_ADMIN_EMAIL', 'admin@example.com'));
         $adminPassword = (string) ($this->secret('Default admin password') ?: 'password');
 
-        $mailMailer = (string) $this->ask('Mail driver (smtp/log/mailgun/etc)', (string) env('MAIL_MAILER', 'smtp'));
-        $mailHost = (string) $this->ask('Mail host', (string) env('MAIL_HOST', '127.0.0.1'));
-        $mailPort = (string) $this->ask('Mail port', (string) env('MAIL_PORT', '2525'));
-        $mailUsername = (string) $this->ask('Mail username', (string) env('MAIL_USERNAME', ''));
-        $mailPassword = (string) ($this->secret('Mail password (leave empty to keep current)') ?: (string) env('MAIL_PASSWORD', ''));
-        $mailEncryption = (string) $this->ask('Mail encryption (tls/ssl/null)', (string) env('MAIL_ENCRYPTION', 'tls'));
-        $mailFromAddress = (string) $this->ask('Mail from address', (string) env('MAIL_FROM_ADDRESS', 'hello@example.com'));
-        $mailFromName = (string) $this->ask('Mail from name', (string) env('MAIL_FROM_NAME', $appName));
+        // Mail settings are skipped during install — configure them later in .env or via the dashboard settings.
+        $mailMailer = (string) env('MAIL_MAILER', 'log');
+        $mailHost = (string) env('MAIL_HOST', '127.0.0.1');
+        $mailPort = (string) env('MAIL_PORT', '2525');
+        $mailUsername = (string) env('MAIL_USERNAME', '');
+        $mailPassword = (string) env('MAIL_PASSWORD', '');
+        $mailEncryption = (string) env('MAIL_ENCRYPTION', 'tls');
+        $mailFromAddress = (string) env('MAIL_FROM_ADDRESS', 'hello@example.com');
+        $mailFromName = (string) env('MAIL_FROM_NAME', $appName);
+
         $preset = $this->resolveInstallPreset();
 
         return [
@@ -1665,21 +1667,47 @@ PHP;
             return;
         }
 
-        if (isset($decoded['scripts']['dashkit-update'])) {
-            return;
+        $changed = false;
+
+        // Inject preferred-install so Composer checks out the full Git tree
+        // (needed because the package manifest lives in a subfolder, not the repo root)
+        if (! isset($decoded['config']['preferred-install']['dashkit/dashkit'])) {
+            $decoded['config']['preferred-install']['dashkit/dashkit'] = 'source';
+            if (! isset($decoded['config']['preferred-install']['*'])) {
+                $decoded['config']['preferred-install']['*'] = 'dist';
+            }
+            $changed = true;
         }
 
-        $decoded['scripts']['dashkit-update'] = [
-            '@composer update dashkit/dashkit',
-            '@php artisan dashkit:upgrade',
-        ];
+        // Inject dashkit-sync: pulls latest commits from GitHub into vendor and refreshes autoload
+        if (! isset($decoded['scripts']['dashkit-sync'])) {
+            $decoded['scripts']['dashkit-sync'] = [
+                '@php -r "if (!is_dir(\'vendor/dashkit/dashkit/.git\')) { fwrite(STDERR, \'dashkit source checkout not found in vendor/dashkit/dashkit\'.PHP_EOL); exit(1);} chdir(\'vendor/dashkit/dashkit\'); passthru(\'git fetch origin\', $c1); passthru(\'git checkout dashkit-dev\', $c2); passthru(\'git pull origin dashkit-dev\', $c3); exit(($c1 || $c2 || $c3) ? 1 : 0);"',
+                '@composer dump-autoload',
+                '@php artisan package:discover --ansi',
+            ];
+            $changed = true;
+        }
+
+        // Inject dashkit-update: sync then upgrade in one step
+        if (! isset($decoded['scripts']['dashkit-update'])) {
+            $decoded['scripts']['dashkit-update'] = [
+                '@composer run-script dashkit-sync',
+                '@php artisan dashkit:upgrade',
+            ];
+            $changed = true;
+        }
+
+        if (! $changed) {
+            return;
+        }
 
         $this->files->put(
             $composerJsonPath,
             json_encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL
         );
 
-        $this->components->info('Added "dashkit-update" script to composer.json.');
+        $this->components->info('Added dashkit-sync / dashkit-update scripts and preferred-install config to composer.json.');
     }
 
     private function persistPackageState(): void
@@ -1725,6 +1753,7 @@ PHP;
             if ($this->files->isFile($path)) {
                 $relativePath = str_replace($packageRoot.DIRECTORY_SEPARATOR, '', $path);
                 $entries[] = str_replace('\\', '/', $relativePath).':'.(md5_file($path) ?: '');
+
                 continue;
             }
 
@@ -1790,9 +1819,9 @@ PHP;
         $hashes = [];
 
         $singleFiles = [
-            'config/dashkit.php'  => config_path('dashkit.php'),
-            'routes/web.php'      => base_path('routes/web.php'),
-            'bootstrap/app.php'   => base_path('bootstrap/app.php'),
+            'config/dashkit.php' => config_path('dashkit.php'),
+            'routes/web.php' => base_path('routes/web.php'),
+            'bootstrap/app.php' => base_path('bootstrap/app.php'),
         ];
 
         foreach ($singleFiles as $key => $absPath) {

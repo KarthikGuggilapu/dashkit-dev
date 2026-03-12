@@ -41,53 +41,55 @@ cd my-app
 
 **Step 2 — Add the Dashkit package repository**
 
-Open `composer.json` and add the `repositories` block and require the package:
+Open `composer.json` and make the following additions:
+
+**Add to `repositories`:**
 
 ```json
-{
-    "repositories": [
-        {
-            "type": "package",
-            "package": {
-                "name": "dashkit/dashkit",
-                "version": "dev-dashkit-dev",
-                "source": {
-                    "type": "git",
-                    "url": "https://github.com/KarthikGuggilapu/dashkit-dev.git",
-                    "reference": "dashkit-dev"
-                },
-                "type": "library",
-                "require": {
-                    "php": "^8.1",
-                    "illuminate/support": "^10.0|^11.0|^12.0",
-                    "illuminate/routing": "^10.0|^11.0|^12.0",
-                    "illuminate/view": "^10.0|^11.0|^12.0",
-                    "illuminate/auth": "^10.0|^11.0|^12.0",
-                    "illuminate/console": "^10.0|^11.0|^12.0"
-                },
-                "autoload": {
-                    "psr-4": {
-                        "Dashkit\\": "dashkit/src/"
-                    }
-                },
-                "extra": {
-                    "laravel": {
-                        "providers": [
-                            "Dashkit\\DashkitServiceProvider"
-                        ]
-                    }
-                }
-            }
+"repositories": [
+  {
+    "type": "package",
+    "package": {
+      "name": "dashkit/dashkit",
+      "version": "dev-dashkit-dev",
+      "source": {
+        "type": "git",
+        "url": "https://github.com/KarthikGuggilapu/dashkit-dev.git",
+        "reference": "dashkit-dev"
+      },
+      "type": "library",
+      "require": {
+        "php": "^8.2",
+        "illuminate/support": "^12.0",
+        "illuminate/routing": "^12.0",
+        "illuminate/view": "^12.0",
+        "illuminate/auth": "^12.0",
+        "illuminate/console": "^12.0"
+      },
+      "autoload": {
+        "psr-4": {
+          "Dashkit\\\\": "dashkit/src/"
         }
-    ],
-    "require": {
-        "php": "^8.1",
-        "laravel/framework": "^10.0|^11.0|^12.0",
-        "laravel/tinker": "^2.10.1",
-        "dashkit/dashkit": "dev-dashkit-dev"
-    },
-}
+      },
+      "extra": {
+        "laravel": {
+          "providers": [
+            "Dashkit\\\\DashkitServiceProvider"
+          ]
+        }
+      }
+    }
+  }
+]
 ```
+
+**Add to `require`:**
+
+```json
+"dashkit/dashkit": "dev-dashkit-dev"
+```
+
+That's all you need to add manually. The `config.preferred-install` and `scripts` (`dashkit-sync`, `dashkit-update`) are **injected automatically** into your `composer.json` when you run `php artisan dashkit:install`.
 
 > If the repository is **private**, authenticate first:
 > ```bash
@@ -154,7 +156,7 @@ The installer will guide you through each step interactively:
 
 - Publishes config, views, and assets
 - Asks for your app name, database connection, and admin credentials
-- Sets up `.env` values
+- Sets up `.env` values (mail settings are skipped — configure them later in `.env` or the dashboard)
 - Runs migrations and creates the admin user
 - Applies your chosen preset (default, ecommerce, or crm)
 - Generates default pages and sidebar navigation
@@ -203,19 +205,58 @@ This updates your sidebar and creates any missing pages without deleting existin
 
 ## Updating the Package
 
-During install, Dashkit automatically adds a `dashkit-update` script to your `composer.json`.
+### Standard update
 
-Whenever a new version is available, just run:
+Whenever a new version is available, run:
 
 ```bash
 composer run dashkit-update
 ```
 
-This does two things in one step:
-1. Pulls the latest package code from GitHub (`composer update dashkit/dashkit`)
-2. Applies config and asset updates — **your customised views are never overwritten** (`php artisan dashkit:upgrade`)
+This runs two steps in one:
+1. Pulls latest commits from GitHub via `dashkit-sync`
+2. Applies config, view, and asset updates via `php artisan dashkit:upgrade`
 
-> **Want a full UI reset?** Run `php artisan dashkit:upgrade --force` manually. This will overwrite your published views with the latest package versions.
+**Your customised views are never overwritten automatically.** Use `--force` only when you want a full UI reset:
+
+```bash
+php artisan dashkit:upgrade --force
+```
+
+---
+
+### Daily update flow after new Git commits
+
+Whenever package code is updated on branch `dashkit-dev`, run:
+
+```bash
+composer run-script dashkit-sync
+php artisan dashkit:upgrade --type=crm --force
+```
+
+---
+
+### Why not just `composer update`?
+
+With this setup (package manifest inside a subfolder), Composer may show `Nothing to modify` even when new branch commits exist. `dashkit-sync` solves that by directly pulling the latest commits into `vendor/dashkit/dashkit` and refreshing autoload and package discovery.
+
+---
+
+### Troubleshooting
+
+**Sync fails with _source checkout not found_:**
+
+```bash
+composer install
+composer run-script dashkit-sync
+```
+
+**New classes or commands not detected after sync:**
+
+```bash
+composer dump-autoload
+php artisan package:discover --ansi
+```
 
 ---
 

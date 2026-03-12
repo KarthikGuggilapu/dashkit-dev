@@ -16,6 +16,7 @@ use Dashkit\Commands\DashkitUninstallCommand;
 use Dashkit\Commands\DashkitUpgradeCommand;
 use Dashkit\Models\DashkitSetting;
 use Dashkit\Services\WidgetRegistry;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -35,6 +36,7 @@ class DashkitServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadPackageResources();
+        $this->configurePasswordResetUrl();
 
         Blade::component('dashkit::components.layout', 'dashkit-layout');
 
@@ -95,6 +97,34 @@ class DashkitServiceProvider extends ServiceProvider
         foreach ((array) config('dashkit.widgets.defaults', []) as $widget) {
             $registry->register($widget);
         }
+    }
+
+    private function configurePasswordResetUrl(): void
+    {
+        ResetPassword::createUrlUsing(static function (object $notifiable, string $token): string {
+            $email = method_exists($notifiable, 'getEmailForPasswordReset')
+                ? (string) $notifiable->getEmailForPasswordReset()
+                : '';
+
+            $parameters = [
+                'token' => $token,
+                'email' => $email,
+            ];
+
+            if (app('router')->has('dashkit.password.reset')) {
+                return route('dashkit.password.reset', $parameters);
+            }
+
+            if (app('router')->has('password.reset')) {
+                return route('password.reset', $parameters);
+            }
+
+            $fallbackUrl = rtrim((string) config('app.url', ''), '/').'/reset-password/'.$token;
+
+            return $email === ''
+                ? $fallbackUrl
+                : $fallbackUrl.'?email='.urlencode($email);
+        });
     }
 
     private function packagePath(string $path): string

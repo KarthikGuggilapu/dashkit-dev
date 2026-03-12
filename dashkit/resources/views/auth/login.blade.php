@@ -22,12 +22,17 @@
         .dk-link:hover{text-decoration:underline}
         .dk-error{padding:10px 12px;border:1px solid #fecaca;background:#fef2f2;color:#b91c1c;border-radius:10px;font-size:13px}
         .dk-success{padding:10px 12px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:10px;font-size:13px}
+        .dk-toast{position:fixed;top:18px;right:18px;max-width:360px;padding:12px 14px;border-radius:10px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b;box-shadow:0 10px 28px rgba(16,24,40,.12);font-size:13px;line-height:1.45;z-index:9999;opacity:0;transform:translateY(-8px);transition:opacity .2s ease,transform .2s ease}
+        .dk-toast.dk-toast-show{opacity:1;transform:translateY(0)}
         .dk-button{height:44px;border:0;border-radius:10px;background:#111827;color:#fff;font-weight:600;cursor:pointer}
         .dk-button:hover{background:#1f2937}
         .dk-button-full{width:100%}
     </style>
 </head>
 <body>
+@if (session('dashkit_toast_error'))
+    <div id="dk-toast" class="dk-toast" role="status" aria-live="polite">{{ session('dashkit_toast_error') }}</div>
+@endif
 <div class="dk-auth-wrap">
     <main class="dk-auth-card" role="main" aria-labelledby="login-heading">
         <h1 id="login-heading" class="dk-auth-title">{{ config('dashkit.name', 'Dashkit') }}</h1>
@@ -69,5 +74,29 @@
         </form>
     </main>
 </div>
+@if (session('dashkit_toast_error'))
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var toast = document.getElementById('dk-toast');
+        if (!toast) {
+            return;
+        }
+
+        requestAnimationFrame(function () {
+            toast.classList.add('dk-toast-show');
+        });
+
+        setTimeout(function () {
+            toast.classList.remove('dk-toast-show');
+        }, 4200);
+
+        setTimeout(function () {
+            if (toast && toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+            }
+        }, 4500);
+    });
+</script>
+@endif
 </body>
 </html>
