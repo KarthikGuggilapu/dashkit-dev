@@ -326,6 +326,7 @@ class DashkitUpgradeCommand extends Command
     {
         $sourceDir = dirname(__DIR__, 2).DIRECTORY_SEPARATOR.'resources'.DIRECTORY_SEPARATOR.'views';
         $destDir = resource_path('views/vendor/dashkit');
+        $criticalViews = ['components/layout.blade.php'];
 
         if (! $files->isDirectory($sourceDir)) {
             return [];
@@ -364,6 +365,15 @@ class DashkitUpgradeCommand extends Command
             if ($force) {
                 $files->copy($sourceFile->getPathname(), $destPath);
                 $this->line("  <fg=yellow>Force updated view:</> $relativePath");
+                continue;
+            }
+
+            // Core layout must stay aligned with package UX/runtime behavior across upgrades.
+            if (in_array($relativePath, $criticalViews, true)) {
+                $backupPath = $destPath.'.bak.'.now()->format('Ymd_His');
+                $files->copy($destPath, $backupPath);
+                $files->copy($sourceFile->getPathname(), $destPath);
+                $this->line("  <fg=yellow>Updated core layout view:</> $relativePath (backup: ".basename($backupPath).")");
                 continue;
             }
 
