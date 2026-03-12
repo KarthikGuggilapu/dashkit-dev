@@ -89,7 +89,7 @@
 
             <div class="flex items-center gap-2">
                 <button type="button" class="hidden h-8 w-8 place-content-center rounded-lg border border-slate-700 bg-slate-900 text-slate-300 transition hover:border-cyan-500 hover:text-cyan-300 lg:grid" data-dk-sidebar-collapse title="Toggle sidebar width" aria-label="Toggle sidebar width">
-                    <svg class="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                    <svg class="h-4 w-4 transition-transform duration-300" data-dk-sidebar-collapse-icon viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
                         <path d="M12.5 4.5L7 10l5.5 5.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
@@ -245,6 +245,7 @@
         var openSidebar = document.querySelector('[data-dk-sidebar-open]');
         var closeSidebar = document.querySelector('[data-dk-sidebar-close]');
         var collapseSidebar = document.querySelector('[data-dk-sidebar-collapse]');
+        var collapseSidebarIcon = document.querySelector('[data-dk-sidebar-collapse-icon]');
         var collapsedStorageKey = 'dashkit.sidebar.collapsed';
 
         if (!shell || !sidebar || !backdrop) {
@@ -277,9 +278,17 @@
                 shell.classList.add('dk-sidebar-collapsed');
             }
 
+            if (collapseSidebarIcon) {
+                collapseSidebarIcon.classList.toggle('rotate-180', shell.classList.contains('dk-sidebar-collapsed'));
+            }
+
             collapseSidebar.addEventListener('click', function () {
                 shell.classList.toggle('dk-sidebar-collapsed');
                 localStorage.setItem(collapsedStorageKey, shell.classList.contains('dk-sidebar-collapsed') ? '1' : '0');
+
+                if (collapseSidebarIcon) {
+                    collapseSidebarIcon.classList.toggle('rotate-180', shell.classList.contains('dk-sidebar-collapsed'));
+                }
             });
         }
 
