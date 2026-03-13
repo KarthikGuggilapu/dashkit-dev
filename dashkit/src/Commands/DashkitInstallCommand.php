@@ -35,6 +35,16 @@ class DashkitInstallCommand extends Command
             return self::FAILURE;
         }
 
+        $this->call('vendor:publish', [
+            '--tag' => 'dashkit-config',
+            '--force' => true,
+        ]);
+
+        $this->enableDashkitFlag();
+
+        $this->call('config:clear');
+        $this->call('route:clear');
+
         $this->files = $files;
         $this->manifest = new ArtifactManifest($files);
         $this->installState = ['files' => [], 'created_at' => now()->toDateTimeString()];
@@ -579,592 +589,592 @@ class DashkitInstallCommand extends Command
     private function overviewPageTemplate(): string
     {
         return <<<'BLADE'
-<x-dashkit-layout title="Overview">
-    <!-- Stat Cards Section -->
-    <section class="mb-8">
-        <h2 class="mb-4 text-2xl font-bold text-slate-900">Overview</h2>
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <!-- Stat Card 1 -->
-            <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-slate-500">Total Revenue</p>
-                        <p class="mt-2 text-3xl font-bold text-slate-900">$12,450</p>
-                    </div>
-                    <div class="rounded-lg bg-blue-100 p-3">
-                        <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <p class="mt-4 text-xs text-emerald-600 font-medium">↑ 12% from last month</p>
-            </article>
+        <x-dashkit-layout title="Overview">
+            <!-- Stat Cards Section -->
+            <section class="mb-8">
+                <h2 class="mb-4 text-2xl font-bold text-slate-900">Overview</h2>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <!-- Stat Card 1 -->
+                    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-slate-500">Total Revenue</p>
+                                <p class="mt-2 text-3xl font-bold text-slate-900">$12,450</p>
+                            </div>
+                            <div class="rounded-lg bg-blue-100 p-3">
+                                <svg class="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="mt-4 text-xs text-emerald-600 font-medium">↑ 12% from last month</p>
+                    </article>
 
-            <!-- Stat Card 2 -->
-            <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-slate-500">Total Orders</p>
-                        <p class="mt-2 text-3xl font-bold text-slate-900">2,859</p>
-                    </div>
-                    <div class="rounded-lg bg-emerald-100 p-3">
-                        <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-                        </svg>
-                    </div>
-                </div>
-                <p class="mt-4 text-xs text-emerald-600 font-medium">↑ 8% from last month</p>
-            </article>
+                    <!-- Stat Card 2 -->
+                    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-slate-500">Total Orders</p>
+                                <p class="mt-2 text-3xl font-bold text-slate-900">2,859</p>
+                            </div>
+                            <div class="rounded-lg bg-emerald-100 p-3">
+                                <svg class="h-6 w-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="mt-4 text-xs text-emerald-600 font-medium">↑ 8% from last month</p>
+                    </article>
 
-            <!-- Stat Card 3 -->
-            <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-slate-500">Total Users</p>
-                        <p class="mt-2 text-3xl font-bold text-slate-900">5,483</p>
-                    </div>
-                    <div class="rounded-lg bg-purple-100 p-3">
-                        <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.856-1.487M15 10a3 3 0 11-6 0 3 3 0 016 0zM6 20h12v-2a9 9 0 00-9-9 9 9 0 00-3 .134V16"></path>
-                        </svg>
-                    </div>
-                </div>
-                <p class="mt-4 text-xs text-emerald-600 font-medium">↑ 5% from last month</p>
-            </article>
+                    <!-- Stat Card 3 -->
+                    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-slate-500">Total Users</p>
+                                <p class="mt-2 text-3xl font-bold text-slate-900">5,483</p>
+                            </div>
+                            <div class="rounded-lg bg-purple-100 p-3">
+                                <svg class="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.856-1.487M15 10a3 3 0 11-6 0 3 3 0 016 0zM6 20h12v-2a9 9 0 00-9-9 9 9 0 00-3 .134V16"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="mt-4 text-xs text-emerald-600 font-medium">↑ 5% from last month</p>
+                    </article>
 
-            <!-- Stat Card 4 -->
-            <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <div class="flex items-center justify-between">
-                    <div>
-                        <p class="text-sm font-medium text-slate-500">Conversion Rate</p>
-                        <p class="mt-2 text-3xl font-bold text-slate-900">3.24%</p>
+                    <!-- Stat Card 4 -->
+                    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-slate-500">Conversion Rate</p>
+                                <p class="mt-2 text-3xl font-bold text-slate-900">3.24%</p>
+                            </div>
+                            <div class="rounded-lg bg-orange-100 p-3">
+                                <svg class="h-6 w-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                </svg>
+                            </div>
+                        </div>
+                        <p class="mt-4 text-xs text-red-600 font-medium">↓ 2% from last month</p>
+                    </article>
+                </div>
+            </section>
+
+            <!-- Charts & Analytics Section -->
+            <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <!-- Chart 1 -->
+                <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-lg font-bold text-slate-900">Revenue Trend</h3>
+                    <div class="flex h-64 items-center justify-center bg-slate-50">
+                        <div class="text-center">
+                            <p class="text-slate-500">📊 Chart visualization will appear here</p>
+                            <p class="mt-2 text-xs text-slate-400">Install a charting library (Chart.js, ApexCharts, etc.) to display data</p>
+                        </div>
                     </div>
-                    <div class="rounded-lg bg-orange-100 p-3">
-                        <svg class="h-6 w-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
-                        </svg>
+                </article>
+
+                <!-- Chart 2 -->
+                <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-lg font-bold text-slate-900">Category Distribution</h3>
+                    <div class="flex h-64 items-center justify-center bg-slate-50">
+                        <div class="text-center">
+                            <p class="text-slate-500">📈 Pie/Donut chart will appear here</p>
+                            <p class="mt-2 text-xs text-slate-400">Connect real data from your database</p>
+                        </div>
                     </div>
-                </div>
-                <p class="mt-4 text-xs text-red-600 font-medium">↓ 2% from last month</p>
-            </article>
-        </div>
-    </section>
+                </article>
+            </section>
 
-    <!-- Charts & Analytics Section -->
-    <section class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <!-- Chart 1 -->
-        <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-4 text-lg font-bold text-slate-900">Revenue Trend</h3>
-            <div class="flex h-64 items-center justify-center bg-slate-50">
-                <div class="text-center">
-                    <p class="text-slate-500">📊 Chart visualization will appear here</p>
-                    <p class="mt-2 text-xs text-slate-400">Install a charting library (Chart.js, ApexCharts, etc.) to display data</p>
-                </div>
-            </div>
-        </article>
-
-        <!-- Chart 2 -->
-        <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-4 text-lg font-bold text-slate-900">Category Distribution</h3>
-            <div class="flex h-64 items-center justify-center bg-slate-50">
-                <div class="text-center">
-                    <p class="text-slate-500">📈 Pie/Donut chart will appear here</p>
-                    <p class="mt-2 text-xs text-slate-400">Connect real data from your database</p>
-                </div>
-            </div>
-        </article>
-    </section>
-
-    <!-- Recent Activity Section -->
-    <section class="mt-8">
-        <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-4 text-lg font-bold text-slate-900">Recent Orders</h3>
-            <div class="overflow-x-auto">
-                <table class="w-full text-sm">
-                    <thead>
-                        <tr class="border-b border-slate-200">
-                            <th class="py-3 px-4 text-left font-semibold text-slate-700">Order ID</th>
-                            <th class="py-3 px-4 text-left font-semibold text-slate-700">Customer</th>
-                            <th class="py-3 px-4 text-left font-semibold text-slate-700">Amount</th>
-                            <th class="py-3 px-4 text-left font-semibold text-slate-700">Status</th>
-                            <th class="py-3 px-4 text-left font-semibold text-slate-700">Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr class="border-b border-slate-200 hover:bg-slate-50">
-                            <td class="py-3 px-4 font-medium text-slate-900">#ORD-001</td>
-                            <td class="py-3 px-4 text-slate-600">John Doe</td>
-                            <td class="py-3 px-4 font-semibold text-slate-900">$1,299</td>
-                            <td class="py-3 px-4"><span class="inline-block rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Completed</span></td>
-                            <td class="py-3 px-4 text-slate-500">Mar 10, 2026</td>
-                        </tr>
-                        <tr class="border-b border-slate-200 hover:bg-slate-50">
-                            <td class="py-3 px-4 font-medium text-slate-900">#ORD-002</td>
-                            <td class="py-3 px-4 text-slate-600">Jane Smith</td>
-                            <td class="py-3 px-4 font-semibold text-slate-900">$899</td>
-                            <td class="py-3 px-4"><span class="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">Processing</span></td>
-                            <td class="py-3 px-4 text-slate-500">Mar 09, 2026</td>
-                        </tr>
-                        <tr class="hover:bg-slate-50">
-                            <td class="py-3 px-4 font-medium text-slate-900">#ORD-003</td>
-                            <td class="py-3 px-4 text-slate-600">Mike Johnson</td>
-                            <td class="py-3 px-4 font-semibold text-slate-900">$2,150</td>
-                            <td class="py-3 px-4"><span class="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Pending</span></td>
-                            <td class="py-3 px-4 text-slate-500">Mar 08, 2026</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
-            <div class="mt-4 text-center">
-                <a href="javascript:void(0)" class="text-sm font-semibold text-blue-600 hover:text-blue-700">View all orders →</a>
-            </div>
-        </article>
-    </section>
-</x-dashkit-layout>
-BLADE;
+            <!-- Recent Activity Section -->
+            <section class="mt-8">
+                <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-lg font-bold text-slate-900">Recent Orders</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-slate-200">
+                                    <th class="py-3 px-4 text-left font-semibold text-slate-700">Order ID</th>
+                                    <th class="py-3 px-4 text-left font-semibold text-slate-700">Customer</th>
+                                    <th class="py-3 px-4 text-left font-semibold text-slate-700">Amount</th>
+                                    <th class="py-3 px-4 text-left font-semibold text-slate-700">Status</th>
+                                    <th class="py-3 px-4 text-left font-semibold text-slate-700">Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="border-b border-slate-200 hover:bg-slate-50">
+                                    <td class="py-3 px-4 font-medium text-slate-900">#ORD-001</td>
+                                    <td class="py-3 px-4 text-slate-600">John Doe</td>
+                                    <td class="py-3 px-4 font-semibold text-slate-900">$1,299</td>
+                                    <td class="py-3 px-4"><span class="inline-block rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">Completed</span></td>
+                                    <td class="py-3 px-4 text-slate-500">Mar 10, 2026</td>
+                                </tr>
+                                <tr class="border-b border-slate-200 hover:bg-slate-50">
+                                    <td class="py-3 px-4 font-medium text-slate-900">#ORD-002</td>
+                                    <td class="py-3 px-4 text-slate-600">Jane Smith</td>
+                                    <td class="py-3 px-4 font-semibold text-slate-900">$899</td>
+                                    <td class="py-3 px-4"><span class="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">Processing</span></td>
+                                    <td class="py-3 px-4 text-slate-500">Mar 09, 2026</td>
+                                </tr>
+                                <tr class="hover:bg-slate-50">
+                                    <td class="py-3 px-4 font-medium text-slate-900">#ORD-003</td>
+                                    <td class="py-3 px-4 text-slate-600">Mike Johnson</td>
+                                    <td class="py-3 px-4 font-semibold text-slate-900">$2,150</td>
+                                    <td class="py-3 px-4"><span class="inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">Pending</span></td>
+                                    <td class="py-3 px-4 text-slate-500">Mar 08, 2026</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <a href="javascript:void(0)" class="text-sm font-semibold text-blue-600 hover:text-blue-700">View all orders →</a>
+                    </div>
+                </article>
+            </section>
+        </x-dashkit-layout>
+        BLADE;
     }
 
     private function reportsPageTemplate(): string
     {
         return <<<'BLADE'
-<x-dashkit-layout title="Reports">
-    <section class="mb-8">
-        <div class="flex items-center justify-between mb-6">
-            <div>
-                <h2 class="text-2xl font-bold text-slate-900">Reports</h2>
-                <p class="mt-1 text-sm text-slate-500">Analyze your business performance and metrics</p>
-            </div>
-            <button class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition">
-                Export Report
-            </button>
-        </div>
+        <x-dashkit-layout title="Reports">
+            <section class="mb-8">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">Reports</h2>
+                        <p class="mt-1 text-sm text-slate-500">Analyze your business performance and metrics</p>
+                    </div>
+                    <button class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition">
+                        Export Report
+                    </button>
+                </div>
 
-        <!-- Filter Section -->
-        <div class="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-4 font-semibold text-slate-900">Filters</h3>
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Date Range</label>
-                    <select class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                        <option>Last 7 days</option>
-                        <option>Last 30 days</option>
-                        <option>Last 90 days</option>
-                        <option>This year</option>
-                    </select>
+                <!-- Filter Section -->
+                <div class="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 font-semibold text-slate-900">Filters</h3>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Date Range</label>
+                            <select class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <option>Last 7 days</option>
+                                <option>Last 30 days</option>
+                                <option>Last 90 days</option>
+                                <option>This year</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Category</label>
+                            <select class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <option>All Categories</option>
+                                <option>Electronics</option>
+                                <option>Clothing</option>
+                                <option>Home & Garden</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
+                            <select class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <option>All Statuses</option>
+                                <option>Completed</option>
+                                <option>Processing</option>
+                                <option>Pending</option>
+                            </select>
+                        </div>
+                    </div>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Category</label>
-                    <select class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                        <option>All Categories</option>
-                        <option>Electronics</option>
-                        <option>Clothing</option>
-                        <option>Home & Garden</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
-                    <select class="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                        <option>All Statuses</option>
-                        <option>Completed</option>
-                        <option>Processing</option>
-                        <option>Pending</option>
-                    </select>
-                </div>
-            </div>
-        </div>
 
-        <!-- Reports Grid -->
-        <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <!-- Sales Report -->
-            <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 class="mb-4 text-lg font-bold text-slate-900">Sales Report</h3>
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Total Sales</span>
-                        <span class="text-xl font-bold text-slate-900">$45,230</span>
-                    </div>
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Avg Order Value</span>
-                        <span class="text-xl font-bold text-slate-900">$156.50</span>
-                    </div>
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Total Orders</span>
-                        <span class="text-xl font-bold text-slate-900">289</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium text-slate-700">Conversion Rate</span>
-                        <span class="text-xl font-bold text-emerald-600">3.24%</span>
-                    </div>
-                </div>
-            </article>
+                <!-- Reports Grid -->
+                <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <!-- Sales Report -->
+                    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 class="mb-4 text-lg font-bold text-slate-900">Sales Report</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Total Sales</span>
+                                <span class="text-xl font-bold text-slate-900">$45,230</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Avg Order Value</span>
+                                <span class="text-xl font-bold text-slate-900">$156.50</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Total Orders</span>
+                                <span class="text-xl font-bold text-slate-900">289</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-slate-700">Conversion Rate</span>
+                                <span class="text-xl font-bold text-emerald-600">3.24%</span>
+                            </div>
+                        </div>
+                    </article>
 
-            <!-- Customer Report -->
-            <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 class="mb-4 text-lg font-bold text-slate-900">Customer Report</h3>
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Total Customers</span>
-                        <span class="text-xl font-bold text-slate-900">5,483</span>
-                    </div>
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">New Customers</span>
-                        <span class="text-xl font-bold text-slate-900">342</span>
-                    </div>
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Repeat Customers</span>
-                        <span class="text-xl font-bold text-slate-900">1,245</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium text-slate-700">Customer Retention</span>
-                        <span class="text-xl font-bold text-blue-600">87.3%</span>
-                    </div>
-                </div>
-            </article>
+                    <!-- Customer Report -->
+                    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 class="mb-4 text-lg font-bold text-slate-900">Customer Report</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Total Customers</span>
+                                <span class="text-xl font-bold text-slate-900">5,483</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">New Customers</span>
+                                <span class="text-xl font-bold text-slate-900">342</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Repeat Customers</span>
+                                <span class="text-xl font-bold text-slate-900">1,245</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-slate-700">Customer Retention</span>
+                                <span class="text-xl font-bold text-blue-600">87.3%</span>
+                            </div>
+                        </div>
+                    </article>
 
-            <!-- Traffic Report -->
-            <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 class="mb-4 text-lg font-bold text-slate-900">Traffic Report</h3>
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Total Visitors</span>
-                        <span class="text-xl font-bold text-slate-900">24,592</span>
-                    </div>
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Unique Visitors</span>
-                        <span class="text-xl font-bold text-slate-900">18,324</span>
-                    </div>
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Bounce Rate</span>
-                        <span class="text-xl font-bold text-red-600">32%</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium text-slate-700">Avg Session Duration</span>
-                        <span class="text-xl font-bold text-slate-900">4m 23s</span>
-                    </div>
-                </div>
-            </article>
+                    <!-- Traffic Report -->
+                    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 class="mb-4 text-lg font-bold text-slate-900">Traffic Report</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Total Visitors</span>
+                                <span class="text-xl font-bold text-slate-900">24,592</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Unique Visitors</span>
+                                <span class="text-xl font-bold text-slate-900">18,324</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Bounce Rate</span>
+                                <span class="text-xl font-bold text-red-600">32%</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-slate-700">Avg Session Duration</span>
+                                <span class="text-xl font-bold text-slate-900">4m 23s</span>
+                            </div>
+                        </div>
+                    </article>
 
-            <!-- Inventory Report -->
-            <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <h3 class="mb-4 text-lg font-bold text-slate-900">Inventory Report</h3>
-                <div class="space-y-4">
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Total Stock</span>
-                        <span class="text-xl font-bold text-slate-900">5,483</span>
-                    </div>
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Low Stock Items</span>
-                        <span class="text-xl font-bold text-orange-600">38</span>
-                    </div>
-                    <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                        <span class="text-sm font-medium text-slate-700">Out of Stock</span>
-                        <span class="text-xl font-bold text-red-600">12</span>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <span class="text-sm font-medium text-slate-700">Stock Turnover Rate</span>
-                        <span class="text-xl font-bold text-emerald-600">4.2x</span>
-                    </div>
+                    <!-- Inventory Report -->
+                    <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                        <h3 class="mb-4 text-lg font-bold text-slate-900">Inventory Report</h3>
+                        <div class="space-y-4">
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Total Stock</span>
+                                <span class="text-xl font-bold text-slate-900">5,483</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Low Stock Items</span>
+                                <span class="text-xl font-bold text-orange-600">38</span>
+                            </div>
+                            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                                <span class="text-sm font-medium text-slate-700">Out of Stock</span>
+                                <span class="text-xl font-bold text-red-600">12</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm font-medium text-slate-700">Stock Turnover Rate</span>
+                                <span class="text-xl font-bold text-emerald-600">4.2x</span>
+                            </div>
+                        </div>
+                    </article>
                 </div>
-            </article>
-        </div>
-    </section>
-</x-dashkit-layout>
-BLADE;
+            </section>
+        </x-dashkit-layout>
+        BLADE;
     }
 
     private function settingsPageTemplate(): string
     {
         return <<<'BLADE'
-<x-dashkit-layout title="Settings">
-    <section class="mb-8">
-        <h2 class="mb-6 text-2xl font-bold text-slate-900">Settings</h2>
+        <x-dashkit-layout title="Settings">
+            <section class="mb-8">
+                <h2 class="mb-6 text-2xl font-bold text-slate-900">Settings</h2>
 
-        <!-- General Settings -->
-        <article class="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-6 text-lg font-bold text-slate-900">General Settings</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Application Name</label>
-                    <input type="text" value="Dashkit" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="Enter app name">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Application URL</label>
-                    <input type="url" value="https://example.com" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="Enter app URL">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Support Email</label>
-                    <input type="email" value="support@example.com" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="Enter support email">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Timezone</label>
-                    <select class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                        <option>UTC</option>
-                        <option>EST</option>
-                        <option>CST</option>
-                        <option>PST</option>
-                    </select>
-                </div>
-            </div>
-            <div class="mt-6 pt-6 border-t border-slate-200">
-                <button class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition">
-                    Save Changes
-                </button>
-            </div>
-        </article>
+                <!-- General Settings -->
+                <article class="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-6 text-lg font-bold text-slate-900">General Settings</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Application Name</label>
+                            <input type="text" value="Dashkit" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="Enter app name">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Application URL</label>
+                            <input type="url" value="https://example.com" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="Enter app URL">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Support Email</label>
+                            <input type="email" value="support@example.com" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500" placeholder="Enter support email">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Timezone</label>
+                            <select class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <option>UTC</option>
+                                <option>EST</option>
+                                <option>CST</option>
+                                <option>PST</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-6 pt-6 border-t border-slate-200">
+                        <button class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition">
+                            Save Changes
+                        </button>
+                    </div>
+                </article>
 
-        <!-- Email Settings -->
-        <article class="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-6 text-lg font-bold text-slate-900">Email Configuration</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">Mail Driver</label>
-                    <select class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                        <option>SMTP</option>
-                        <option>Mailgun</option>
-                        <option>Postmark</option>
-                        <option>SES</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">SMTP Host</label>
-                    <input type="text" value="smtp.mailtrap.io" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">SMTP Port</label>
-                    <input type="number" value="465" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-2">From Address</label>
-                    <input type="email" value="noreply@example.com" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                </div>
-            </div>
-            <div class="mt-6 pt-6 border-t border-slate-200">
-                <button class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition">
-                    Save Email Settings
-                </button>
-            </div>
-        </article>
+                <!-- Email Settings -->
+                <article class="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-6 text-lg font-bold text-slate-900">Email Configuration</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Mail Driver</label>
+                            <select class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                                <option>SMTP</option>
+                                <option>Mailgun</option>
+                                <option>Postmark</option>
+                                <option>SES</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">SMTP Host</label>
+                            <input type="text" value="smtp.mailtrap.io" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">SMTP Port</label>
+                            <input type="number" value="465" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">From Address</label>
+                            <input type="email" value="noreply@example.com" class="w-full rounded-lg border border-slate-300 px-4 py-2 text-slate-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        </div>
+                    </div>
+                    <div class="mt-6 pt-6 border-t border-slate-200">
+                        <button class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition">
+                            Save Email Settings
+                        </button>
+                    </div>
+                </article>
 
-        <!-- Security Settings -->
-        <article class="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-6 text-lg font-bold text-slate-900">Security & Privacy</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="flex items-center space-x-3">
-                        <input type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        <span class="font-medium text-slate-900">Enable Two-Factor Authentication</span>
-                    </label>
-                </div>
-                <div>
-                    <label class="flex items-center space-x-3">
-                        <input type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        <span class="font-medium text-slate-900">Require password change on first login</span>
-                    </label>
-                </div>
-                <div>
-                    <label class="flex items-center space-x-3">
-                        <input type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        <span class="font-medium text-slate-900">Allow users to export their data</span>
-                    </label>
-                </div>
-                <div>
-                    <label class="flex items-center space-x-3">
-                        <input type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        <span class="font-medium text-slate-900">Log all user activities</span>
-                    </label>
-                </div>
-            </div>
-            <div class="mt-6 pt-6 border-t border-slate-200">
-                <button class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition">
-                    Save Security Settings
-                </button>
-            </div>
-        </article>
+                <!-- Security Settings -->
+                <article class="mb-6 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-6 text-lg font-bold text-slate-900">Security & Privacy</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                <span class="font-medium text-slate-900">Enable Two-Factor Authentication</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                <span class="font-medium text-slate-900">Require password change on first login</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                <span class="font-medium text-slate-900">Allow users to export their data</span>
+                            </label>
+                        </div>
+                        <div>
+                            <label class="flex items-center space-x-3">
+                                <input type="checkbox" checked class="rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                <span class="font-medium text-slate-900">Log all user activities</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mt-6 pt-6 border-t border-slate-200">
+                        <button class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700 transition">
+                            Save Security Settings
+                        </button>
+                    </div>
+                </article>
 
-        <!-- Backup & Maintenance -->
-        <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-6 text-lg font-bold text-slate-900">Backup & Maintenance</h3>
-            <div class="space-y-4">
-                <div class="rounded-lg bg-slate-50 p-4">
-                    <p class="font-medium text-slate-900">Database Backup</p>
-                    <p class="mt-1 text-sm text-slate-500">Last backup: Mar 10, 2026 at 03:45 AM</p>
-                    <button class="mt-3 rounded-lg bg-white px-4 py-2 font-medium text-slate-900 border border-slate-300 hover:bg-slate-50 transition">
-                        Backup Now
-                    </button>
-                </div>
-                <div class="rounded-lg bg-slate-50 p-4">
-                    <p class="font-medium text-slate-900">Clear Cache</p>
-                    <p class="mt-1 text-sm text-slate-500">Remove all cached data to free up space</p>
-                    <button class="mt-3 rounded-lg bg-white px-4 py-2 font-medium text-slate-900 border border-slate-300 hover:bg-slate-50 transition">
-                        Clear Cache
-                    </button>
-                </div>
-            </div>
-        </article>
-    </section>
-</x-dashkit-layout>
-BLADE;
+                <!-- Backup & Maintenance -->
+                <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-6 text-lg font-bold text-slate-900">Backup & Maintenance</h3>
+                    <div class="space-y-4">
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="font-medium text-slate-900">Database Backup</p>
+                            <p class="mt-1 text-sm text-slate-500">Last backup: Mar 10, 2026 at 03:45 AM</p>
+                            <button class="mt-3 rounded-lg bg-white px-4 py-2 font-medium text-slate-900 border border-slate-300 hover:bg-slate-50 transition">
+                                Backup Now
+                            </button>
+                        </div>
+                        <div class="rounded-lg bg-slate-50 p-4">
+                            <p class="font-medium text-slate-900">Clear Cache</p>
+                            <p class="mt-1 text-sm text-slate-500">Remove all cached data to free up space</p>
+                            <button class="mt-3 rounded-lg bg-white px-4 py-2 font-medium text-slate-900 border border-slate-300 hover:bg-slate-50 transition">
+                                Clear Cache
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            </section>
+        </x-dashkit-layout>
+        BLADE;
     }
 
     private function profilePageTemplate(): string
     {
         return <<<'BLADE'
-<x-dashkit-layout title="Profile">
-    @php
-        $user = $user ?? auth()->user();
-        $mailSettings = $mailSettings ?? [
-            'mailer' => env('MAIL_MAILER', 'smtp'),
-            'host' => env('MAIL_HOST', '127.0.0.1'),
-            'port' => env('MAIL_PORT', '2525'),
-            'username' => env('MAIL_USERNAME', ''),
-            'encryption' => env('MAIL_ENCRYPTION', 'tls'),
-            'from_address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-            'from_name' => env('MAIL_FROM_NAME', config('app.name', 'Dashkit')),
-        ];
-        $name = (string) ($user?->name ?? 'Dashkit User');
-        $email = (string) ($user?->email ?? 'not-available@example.com');
-        $initials = collect(explode(' ', trim($name)))->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->implode('');
-        $initials = $initials !== '' ? $initials : 'DU';
-    @endphp
+        <x-dashkit-layout title="Profile">
+            @php
+                $user = $user ?? auth()->user();
+                $mailSettings = $mailSettings ?? [
+                    'mailer' => env('MAIL_MAILER', 'smtp'),
+                    'host' => env('MAIL_HOST', '127.0.0.1'),
+                    'port' => env('MAIL_PORT', '2525'),
+                    'username' => env('MAIL_USERNAME', ''),
+                    'encryption' => env('MAIL_ENCRYPTION', 'tls'),
+                    'from_address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
+                    'from_name' => env('MAIL_FROM_NAME', config('app.name', 'Dashkit')),
+                ];
+                $name = (string) ($user?->name ?? 'Dashkit User');
+                $email = (string) ($user?->email ?? 'not-available@example.com');
+                $initials = collect(explode(' ', trim($name)))->filter()->map(fn ($part) => strtoupper(substr($part, 0, 1)))->take(2)->implode('');
+                $initials = $initials !== '' ? $initials : 'DU';
+            @endphp
 
-    @if (session('status') === 'profile-updated')
-        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Profile updated successfully.</div>
-    @endif
+            @if (session('status') === 'profile-updated')
+                <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Profile updated successfully.</div>
+            @endif
 
-    @if (session('status') === 'password-updated')
-        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Password updated successfully.</div>
-    @endif
+            @if (session('status') === 'password-updated')
+                <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Password updated successfully.</div>
+            @endif
 
-    @if (session('status') === 'mail-settings-updated')
-        <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Mail settings saved.</div>
-    @endif
+            @if (session('status') === 'mail-settings-updated')
+                <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">Mail settings saved.</div>
+            @endif
 
-    <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-        <div class="flex flex-wrap items-center gap-4">
-            <div class="grid h-16 w-16 place-content-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-xl font-bold text-white">{{ $initials }}</div>
-            <div>
-                <h2 class="text-2xl font-bold text-slate-900">{{ $name }}</h2>
-                <p class="text-sm text-slate-500">{{ $email }}</p>
-            </div>
-        </div>
-
-        <div class="mt-6 grid gap-4 md:grid-cols-3">
-            <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</p>
-                <p class="mt-1 text-sm font-semibold text-slate-800">Administrator</p>
-            </article>
-            <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Access</p>
-                <p class="mt-1 text-sm font-semibold text-slate-800">Full Dashboard</p>
-            </article>
-            <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
-                <p class="mt-1 text-sm font-semibold text-emerald-700">Active</p>
-            </article>
-        </div>
-    </section>
-
-    <section class="grid gap-6 lg:grid-cols-2">
-        <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-4 text-lg font-bold text-slate-900">Edit Profile</h3>
-            <form method="POST" action="{{ route('dashkit.profile.update') }}" class="space-y-4">
-                @csrf
-
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="profile_name">Name</label>
-                    <input id="profile_name" type="text" name="name" value="{{ old('name', $name) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                    @error('name')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+            <section class="mb-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div class="flex flex-wrap items-center gap-4">
+                    <div class="grid h-16 w-16 place-content-center rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-500 text-xl font-bold text-white">{{ $initials }}</div>
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-900">{{ $name }}</h2>
+                        <p class="text-sm text-slate-500">{{ $email }}</p>
+                    </div>
                 </div>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="profile_email">Email</label>
-                    <input id="profile_email" type="email" name="email" value="{{ old('email', $email) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                    @error('email')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+                <div class="mt-6 grid gap-4 md:grid-cols-3">
+                    <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Role</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-800">Administrator</p>
+                    </article>
+                    <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Access</p>
+                        <p class="mt-1 text-sm font-semibold text-slate-800">Full Dashboard</p>
+                    </article>
+                    <article class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</p>
+                        <p class="mt-1 text-sm font-semibold text-emerald-700">Active</p>
+                    </article>
                 </div>
+            </section>
 
-                <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700">Save Profile</button>
-            </form>
-        </article>
+            <section class="grid gap-6 lg:grid-cols-2">
+                <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-lg font-bold text-slate-900">Edit Profile</h3>
+                    <form method="POST" action="{{ route('dashkit.profile.update') }}" class="space-y-4">
+                        @csrf
 
-        <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h3 class="mb-4 text-lg font-bold text-slate-900">Change Password</h3>
-            <form method="POST" action="{{ route('dashkit.profile.password.update') }}" class="space-y-4">
-                @csrf
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="profile_name">Name</label>
+                            <input id="profile_name" type="text" name="name" value="{{ old('name', $name) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                            @error('name')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+                        </div>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="current_password">Current Password</label>
-                    <input id="current_password" type="password" name="current_password" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                    @error('current_password')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
-                </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="profile_email">Email</label>
+                            <input id="profile_email" type="email" name="email" value="{{ old('email', $email) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                            @error('email')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+                        </div>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="new_password">New Password</label>
-                    <input id="new_password" type="password" name="password" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                    @error('password')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
-                </div>
+                        <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700">Save Profile</button>
+                    </form>
+                </article>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="new_password_confirmation">Confirm Password</label>
-                    <input id="new_password_confirmation" type="password" name="password_confirmation" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                </div>
+                <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                    <h3 class="mb-4 text-lg font-bold text-slate-900">Change Password</h3>
+                    <form method="POST" action="{{ route('dashkit.profile.password.update') }}" class="space-y-4">
+                        @csrf
 
-                <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700">Update Password</button>
-            </form>
-        </article>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="current_password">Current Password</label>
+                            <input id="current_password" type="password" name="current_password" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                            @error('current_password')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+                        </div>
 
-        <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
-            <h3 class="mb-4 text-lg font-bold text-slate-900">Mail Settings</h3>
-            <form method="POST" action="{{ route('dashkit.settings.mail.update') }}" class="grid gap-4 md:grid-cols-2">
-                @csrf
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="new_password">New Password</label>
+                            <input id="new_password" type="password" name="password" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                            @error('password')<p class="mt-1 text-sm text-rose-600">{{ $message }}</p>@enderror
+                        </div>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_mailer">Mailer</label>
-                    <input id="mail_mailer" type="text" name="mail_mailer" value="{{ old('mail_mailer', (string) ($mailSettings['mailer'] ?? 'smtp')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="new_password_confirmation">Confirm Password</label>
+                            <input id="new_password_confirmation" type="password" name="password_confirmation" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                        </div>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_host">Host</label>
-                    <input id="mail_host" type="text" name="mail_host" value="{{ old('mail_host', (string) ($mailSettings['host'] ?? '127.0.0.1')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                </div>
+                        <button type="submit" class="rounded-lg bg-slate-900 px-4 py-2 font-medium text-white hover:bg-slate-700">Update Password</button>
+                    </form>
+                </article>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_port">Port</label>
-                    <input id="mail_port" type="number" name="mail_port" value="{{ old('mail_port', (string) ($mailSettings['port'] ?? '2525')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                </div>
+                <article class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-2">
+                    <h3 class="mb-4 text-lg font-bold text-slate-900">Mail Settings</h3>
+                    <form method="POST" action="{{ route('dashkit.settings.mail.update') }}" class="grid gap-4 md:grid-cols-2">
+                        @csrf
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_username">Username</label>
-                    <input id="mail_username" type="text" name="mail_username" value="{{ old('mail_username', (string) ($mailSettings['username'] ?? '')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
-                </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_mailer">Mailer</label>
+                            <input id="mail_mailer" type="text" name="mail_mailer" value="{{ old('mail_mailer', (string) ($mailSettings['mailer'] ?? 'smtp')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                        </div>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_password">Password (leave blank to keep current)</label>
-                    <input id="mail_password" type="password" name="mail_password" class="w-full rounded-lg border border-slate-300 px-3 py-2">
-                </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_host">Host</label>
+                            <input id="mail_host" type="text" name="mail_host" value="{{ old('mail_host', (string) ($mailSettings['host'] ?? '127.0.0.1')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                        </div>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_encryption">Encryption</label>
-                    <input id="mail_encryption" type="text" name="mail_encryption" value="{{ old('mail_encryption', (string) ($mailSettings['encryption'] ?? 'tls')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
-                </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_port">Port</label>
+                            <input id="mail_port" type="number" name="mail_port" value="{{ old('mail_port', (string) ($mailSettings['port'] ?? '2525')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                        </div>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_from_address">From Address</label>
-                    <input id="mail_from_address" type="email" name="mail_from_address" value="{{ old('mail_from_address', (string) ($mailSettings['from_address'] ?? 'hello@example.com')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_username">Username</label>
+                            <input id="mail_username" type="text" name="mail_username" value="{{ old('mail_username', (string) ($mailSettings['username'] ?? '')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                        </div>
 
-                <div>
-                    <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_from_name">From Name</label>
-                    <input id="mail_from_name" type="text" name="mail_from_name" value="{{ old('mail_from_name', (string) ($mailSettings['from_name'] ?? config('app.name', 'Dashkit'))) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
-                </div>
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_password">Password (leave blank to keep current)</label>
+                            <input id="mail_password" type="password" name="mail_password" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                        </div>
 
-                <div class="md:col-span-2">
-                    <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">Save Mail Settings</button>
-                </div>
-            </form>
-        </article>
-    </section>
-</x-dashkit-layout>
-BLADE;
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_encryption">Encryption</label>
+                            <input id="mail_encryption" type="text" name="mail_encryption" value="{{ old('mail_encryption', (string) ($mailSettings['encryption'] ?? 'tls')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2">
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_from_address">From Address</label>
+                            <input id="mail_from_address" type="email" name="mail_from_address" value="{{ old('mail_from_address', (string) ($mailSettings['from_address'] ?? 'hello@example.com')) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                        </div>
+
+                        <div>
+                            <label class="mb-2 block text-sm font-medium text-slate-700" for="mail_from_name">From Name</label>
+                            <input id="mail_from_name" type="text" name="mail_from_name" value="{{ old('mail_from_name', (string) ($mailSettings['from_name'] ?? config('app.name', 'Dashkit'))) }}" class="w-full rounded-lg border border-slate-300 px-3 py-2" required>
+                        </div>
+
+                        <div class="md:col-span-2">
+                            <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 font-medium text-white hover:bg-blue-700">Save Mail Settings</button>
+                        </div>
+                    </form>
+                </article>
+            </section>
+        </x-dashkit-layout>
+        BLADE;
     }
 
     private function ensureProfilePage(): void
@@ -1898,5 +1908,24 @@ PHP;
         if ($this->files->exists($path)) {
             $this->files->delete($path);
         }
+    }
+
+    private function enableDashkitFlag(): void
+    {
+        $envPath = base_path('.env');
+
+        if (! is_file($envPath)) {
+            return;
+        }
+
+        $env = (string) file_get_contents($envPath);
+
+        if (preg_match('/^DASHKIT_ENABLED=.*/m', $env)) {
+            $env = preg_replace('/^DASHKIT_ENABLED=.*/m', 'DASHKIT_ENABLED=true', $env) ?? $env;
+        } else {
+            $env = rtrim($env).PHP_EOL.'DASHKIT_ENABLED=true'.PHP_EOL;
+        }
+
+        file_put_contents($envPath, $env);
     }
 }

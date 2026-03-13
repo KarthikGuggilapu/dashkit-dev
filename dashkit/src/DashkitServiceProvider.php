@@ -49,9 +49,21 @@ class DashkitServiceProvider extends ServiceProvider
         $this->registerConfigWidgets();
     }
 
+    // private function loadPackageResources(): void
+    // {
+    //     $this->loadRoutesFrom($this->packagePath('routes/web.php'));
+    //     $this->loadViewsFrom($this->packagePath('resources/views'), 'dashkit');
+    //     $this->loadMigrationsFrom($this->packagePath('database/migrations'));
+    //     $this->applyStoredRuntimeSettings();
+    // }
+
     private function loadPackageResources(): void
     {
-        $this->loadRoutesFrom($this->packagePath('routes/web.php'));
+        // Load routes only when Dashkit is explicitly enabled.
+        if ((bool) config('dashkit.enabled', false)) {
+            $this->loadRoutesFrom($this->packagePath('routes/web.php'));
+        }
+
         $this->loadViewsFrom($this->packagePath('resources/views'), 'dashkit');
         $this->loadMigrationsFrom($this->packagePath('database/migrations'));
         $this->applyStoredRuntimeSettings();
