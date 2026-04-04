@@ -6,16 +6,18 @@ use Dashkit\Models\DashkitAuditLog;
 use Dashkit\Models\DashkitSetting;
 use Dashkit\Support\ArtifactManifest;
 use Dashkit\Support\CompatibilityGuard;
+use Dashkit\Support\ProjectTraceInspector;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use PDO;
 use Throwable;
 
 class DashkitInstallCommand extends Command
 {
-    protected $signature = 'dashkit:install {--force : Overwrite published files} {--resume : Continue from last incomplete install step} {--type= : Dashboard preset [default|ecommerce|crm]}';
+    protected $signature = 'dashkit:install {--force : Overwrite published files} {--resume : Continue from last incomplete install step} {--type= : Dashboard preset [default|ecommerce|crm]} {--stop-after= : Stop after completing the given install step key}';
 
     protected $description = 'Install Dashkit by publishing config, views, assets and route registration.';
 
@@ -35,22 +37,56 @@ class DashkitInstallCommand extends Command
             return self::FAILURE;
         }
 
-        $this->call('vendor:publish', [
-            '--tag' => 'dashkit-config',
-            '--force' => true,
-        ]);
-
-        $this->enableDashkitFlag();
-
-        $this->call('config:clear');
-        $this->call('route:clear');
-
         $this->files = $files;
         $this->manifest = new ArtifactManifest($files);
         $this->installState = ['files' => [], 'created_at' => now()->toDateTimeString()];
         $force = (bool) $this->option('force');
         $resume = (bool) $this->option('resume');
+        $stopAfter = $this->normalizeStopAfter((string) $this->option('stop-after'));
         $this->progress = $this->loadInstallProgress();
+
+        if (! $resume) {
+            $strategy = $this->resolveInstallStrategy($files, $force);
+
+            if (! $strategy['proceed']) {
+                return self::FAILURE;
+            }
+
+            $force = $strategy['force'];
+            $resume = $strategy['resume'];
+        }
+
+        if (! $resume) {
+            $this->progress = ['completed' => []];
+
+            if ($this->resolveInstallMode() === 'gui') {
+                $setup = $this->enableGuiSetup();
+
+                $this->components->info('Dashkit GUI setup is ready.');
+                if ($setup['opened']) {
+                    $this->components->info('Opened the setup wizard in your default browser.');
+                    $this->line('Opened URL:');
+                    $this->line($setup['url']);
+                } else {
+                    $this->line('Open this URL in your browser:');
+                    $this->line($setup['url']);
+                }
+
+                if ($setup['fallback_url'] !== null && $setup['fallback_url'] !== $setup['url']) {
+                    $this->line('Configured fallback URL:');
+                    $this->line($setup['fallback_url']);
+                }
+
+                $this->components->warn('Complete the remaining installation steps in the browser wizard.');
+
+                return self::SUCCESS;
+            }
+        }
+
+        $this->enableDashkitFlag();
+
+        $this->call('config:clear');
+        $this->call('route:clear');
 
         if (! $resume) {
             $this->progress = ['completed' => []];
@@ -61,18 +97,30 @@ class DashkitInstallCommand extends Command
         if (! $this->stepCompleted('publish_config')) {
             $this->publishTag('dashkit-config', $force);
             $this->markStepCompleted('publish_config');
+
+            if ($this->shouldStopAfter($stopAfter, 'publish_config')) {
+                return $this->completeStepwiseRun('publish_config');
+            }
         }
 
         $this->line('Step 2/7: Publishing views');
         if (! $this->stepCompleted('publish_views')) {
             $this->publishTag('dashkit-views', $force);
             $this->markStepCompleted('publish_views');
+
+            if ($this->shouldStopAfter($stopAfter, 'publish_views')) {
+                return $this->completeStepwiseRun('publish_views');
+            }
         }
 
         $this->line('Step 3/7: Publishing assets');
         if (! $this->stepCompleted('publish_assets')) {
             $this->publishTag('dashkit-assets', $force);
             $this->markStepCompleted('publish_assets');
+
+            if ($this->shouldStopAfter($stopAfter, 'publish_assets')) {
+                return $this->completeStepwiseRun('publish_assets');
+            }
         }
 
         $this->line('Step 4/7: Route registration');
@@ -84,15 +132,26 @@ class DashkitInstallCommand extends Command
             }
 
             $this->markStepCompleted('route_registration');
+
+            if ($this->shouldStopAfter($stopAfter, 'route_registration')) {
+                return $this->completeStepwiseRun('route_registration');
+            }
         }
 
         $this->line('Step 5/7: Collecting setup inputs and updating .env');
         $setup = $this->progress['setup'] ?? [];
-        if (! $this->stepCompleted('env_setup') || ! is_array($setup) || $setup === []) {
-            $setup = $this->collectSetupInputs();
+        if (! $this->stepCompleted('env_setup')) {
+            if (! is_array($setup) || $setup === []) {
+                $setup = $this->collectSetupInputs();
+            }
+
             $this->updateEnvironment($setup);
             $this->progress['setup'] = $setup;
             $this->markStepCompleted('env_setup');
+
+            if ($this->shouldStopAfter($stopAfter, 'env_setup')) {
+                return $this->completeStepwiseRun('env_setup');
+            }
         }
 
         $this->line('Step 6/7: Enforcing dashboard login redirect and preparing preset pages');
@@ -102,6 +161,10 @@ class DashkitInstallCommand extends Command
             $this->applyPresetSidebarConfig($preset);
             $this->ensureDefaultPages($preset);
             $this->markStepCompleted('post_setup');
+
+            if ($this->shouldStopAfter($stopAfter, 'post_setup')) {
+                return $this->completeStepwiseRun('post_setup');
+            }
         }
 
         $this->line('Step 7/7: Running migrations and seeding admin user');
@@ -139,6 +202,298 @@ class DashkitInstallCommand extends Command
         );
 
         return self::SUCCESS;
+    }
+
+    private function normalizeStopAfter(string $step): ?string
+    {
+        $step = trim($step);
+
+        if ($step === '') {
+            return null;
+        }
+
+        return in_array($step, array_keys($this->installSteps()), true) ? $step : null;
+    }
+
+    private function shouldStopAfter(?string $stopAfter, string $currentStep): bool
+    {
+        return $stopAfter !== null && $stopAfter === $currentStep && $currentStep !== 'migrate_seed';
+    }
+
+    private function completeStepwiseRun(string $step): int
+    {
+        $label = $this->installSteps()[$step] ?? $step;
+
+        $this->components->info('Completed installer step: '.$label);
+        $this->components->info('Run the next step to continue the guided setup.');
+
+        return self::SUCCESS;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function installSteps(): array
+    {
+        return [
+            'publish_config' => 'Publish configuration',
+            'publish_views' => 'Publish views',
+            'publish_assets' => 'Publish assets',
+            'route_registration' => 'Register routes',
+            'env_setup' => 'Collect setup inputs and update environment',
+            'post_setup' => 'Prepare preset pages and dashboard redirect',
+            'migrate_seed' => 'Run migrations and seed admin user',
+        ];
+    }
+
+    /**
+     * @return array{proceed: bool, resume: bool, force: bool}
+     */
+    private function resolveInstallStrategy(Filesystem $files, bool $force): array
+    {
+        $inspector = new ProjectTraceInspector($files);
+        $report = $inspector->inspect();
+
+        foreach ($inspector->summaryLines($report) as $line) {
+            $this->line($line);
+        }
+
+        if ($report['status'] === 'clean') {
+            $this->components->info('No prior Dashkit traces detected. Proceeding with a fresh install.');
+
+            return ['proceed' => true, 'resume' => false, 'force' => $force];
+        }
+
+        if ($report['status'] === 'installed' && ! $force) {
+            $this->components->warn('Dashkit already appears to be installed in this project.');
+            $this->line('Recommended command: '.$report['recommended_command']);
+
+            if (! $this->input->isInteractive()) {
+                return ['proceed' => false, 'resume' => false, 'force' => false];
+            }
+
+            $choice = (string) $this->choice(
+                'Choose how to proceed',
+                [
+                    'cancel',
+                    'reinstall - continue with overwrite behavior',
+                ],
+                'cancel'
+            );
+
+            if ($choice === 'cancel') {
+                return ['proceed' => false, 'resume' => false, 'force' => false];
+            }
+
+            $this->components->warn('Proceeding with reinstall behavior.');
+
+            return ['proceed' => true, 'resume' => false, 'force' => true];
+        }
+
+        if ($report['status'] === 'partial' && ! $force) {
+            $this->components->warn('Partial Dashkit traces were found. Continuing may overwrite or merge with leftover files.');
+            $this->line('Recommended command: '.$report['recommended_command']);
+
+            $hasProgress = false;
+            foreach ($report['traces'] as $trace) {
+                if ($trace['key'] === 'install_progress' && $trace['present']) {
+                    $hasProgress = true;
+                    break;
+                }
+            }
+
+            if (! $this->input->isInteractive()) {
+                $this->line($hasProgress
+                    ? 'Re-run with --resume to continue the interrupted install, or --force to reinstall intentionally.'
+                    : 'Re-run with --force after reviewing dashkit:inspect output.');
+
+                return ['proceed' => false, 'resume' => false, 'force' => false];
+            }
+
+            $choices = $hasProgress
+                ? [
+                    'cancel',
+                    'resume - continue the interrupted install',
+                    'continue - proceed against partial traces',
+                    'reinstall - continue with overwrite behavior',
+                ]
+                : [
+                    'cancel',
+                    'continue - proceed against partial traces',
+                    'reinstall - continue with overwrite behavior',
+                ];
+
+            $choice = (string) $this->choice('Choose how to proceed', $choices, $choices[0]);
+
+            return match ($choice) {
+                'resume - continue the interrupted install' => ['proceed' => true, 'resume' => true, 'force' => false],
+                'continue - proceed against partial traces' => ['proceed' => true, 'resume' => false, 'force' => false],
+                'reinstall - continue with overwrite behavior' => ['proceed' => true, 'resume' => false, 'force' => true],
+                default => ['proceed' => false, 'resume' => false, 'force' => false],
+            };
+        }
+
+        $this->components->warn('Proceeding because --force was supplied, even though Dashkit traces were detected.');
+
+        return ['proceed' => true, 'resume' => false, 'force' => true];
+    }
+
+    private function resolveInstallMode(): string
+    {
+        if (! $this->input->isInteractive()) {
+            return 'cli';
+        }
+
+        $mode = (string) $this->choice(
+            'Choose installation mode',
+            [
+                'cli - terminal setup, recommended for servers and SSH sessions',
+                'gui - browser setup wizard, recommended for local development',
+            ],
+            'cli - terminal setup, recommended for servers and SSH sessions'
+        );
+
+        return str_starts_with($mode, 'gui') ? 'gui' : 'cli';
+    }
+
+    /**
+     * @return array{url: string, fallback_url: string|null, opened: bool}
+     */
+    private function enableGuiSetup(): array
+    {
+        $tokenPath = storage_path('app/dashkit/setup-token.json');
+        $token = Str::random(64);
+        $payload = [
+            'token' => $token,
+            'created_at' => now()->toIso8601String(),
+            'expires_at' => now()->addHours(2)->toIso8601String(),
+        ];
+
+        $this->files->ensureDirectoryExists(dirname($tokenPath));
+        $this->files->put($tokenPath, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+
+        $this->call('route:clear');
+
+        $fallbackUrl = $this->buildSetupUrl($this->configuredAppUrl(), $token);
+        $resolvedUrl = $this->detectRunningSetupUrl($token) ?? $fallbackUrl;
+
+        return [
+            'url' => $resolvedUrl,
+            'fallback_url' => $fallbackUrl,
+            'opened' => $this->openBrowserIfReachable($resolvedUrl, $token),
+        ];
+    }
+
+    private function configuredAppUrl(): string
+    {
+        $appUrl = trim((string) config('app.url', ''));
+
+        return $appUrl !== '' ? $appUrl : 'http://localhost';
+    }
+
+    private function buildSetupUrl(string $baseUrl, string $token): string
+    {
+        return rtrim($baseUrl, '/').'/dashkit-console?token='.$token;
+    }
+
+    private function detectRunningSetupUrl(string $token): ?string
+    {
+        foreach ($this->setupUrlCandidates($token) as $url) {
+            if ($this->isReachableSetupUrl($url)) {
+                return $url;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function setupUrlCandidates(string $token): array
+    {
+        $projectDir = basename(base_path());
+        $bases = [
+            $this->configuredAppUrl(),
+            (string) env('APP_URL', ''),
+            'http://127.0.0.1:8000',
+            'http://localhost:8000',
+            'http://127.0.0.1',
+            'http://localhost',
+            'http://127.0.0.1/'.$projectDir,
+            'http://127.0.0.1/'.$projectDir.'/public',
+            'http://localhost/'.$projectDir,
+            'http://localhost/'.$projectDir.'/public',
+        ];
+
+        $urls = [];
+        foreach ($bases as $base) {
+            $base = trim((string) $base);
+
+            if ($base === '') {
+                continue;
+            }
+
+            $urls[] = $this->buildSetupUrl($base, $token);
+        }
+
+        return array_values(array_unique($urls));
+    }
+
+    private function isReachableSetupUrl(string $url): bool
+    {
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'timeout' => 1.2,
+                'ignore_errors' => true,
+            ],
+            'ssl' => [
+                'verify_peer' => false,
+                'verify_peer_name' => false,
+            ],
+        ]);
+
+        $content = @file_get_contents($url, false, $context);
+
+        if ($content === false) {
+            return false;
+        }
+
+        if (str_contains($content, 'Dashkit Console Setup') || str_contains($content, 'Dashkit Console')) {
+            return true;
+        }
+
+        global $http_response_header;
+        $statusLine = is_array($http_response_header ?? null) ? (string) ($http_response_header[0] ?? '') : '';
+
+        return preg_match('/\s(200|201|202|204|301|302|307|308|401|403|500)\s?/', $statusLine) === 1;
+    }
+
+    private function openBrowserIfReachable(string $url, string $token): bool
+    {
+        if (! $this->isReachableSetupUrl($url)) {
+            return false;
+        }
+
+        $escapedUrl = escapeshellarg($url);
+
+        try {
+            return match (PHP_OS_FAMILY) {
+                'Windows' => $this->openBrowserWithCommand('start "" '.str_replace("'", '', $escapedUrl)),
+                'Darwin' => $this->openBrowserWithCommand('open '.$escapedUrl.' >/dev/null 2>&1 &'),
+                default => $this->openBrowserWithCommand('xdg-open '.$escapedUrl.' >/dev/null 2>&1 &'),
+            };
+        } catch (Throwable) {
+            return false;
+        }
+    }
+
+    private function openBrowserWithCommand(string $command): bool
+    {
+        @pclose(@popen($command, 'r'));
+
+        return true;
     }
 
     /**
@@ -1679,15 +2034,39 @@ PHP;
 
         $changed = false;
 
+        if (! isset($decoded['config']) || ! is_array($decoded['config'])) {
+            $decoded['config'] = [];
+            $changed = true;
+        }
+
+        $preferredInstall = $decoded['config']['preferred-install'] ?? [];
+
+        if (is_string($preferredInstall) && $preferredInstall !== '') {
+            $preferredInstall = ['*' => $preferredInstall];
+            $changed = true;
+        }
+
+        if (! is_array($preferredInstall)) {
+            $preferredInstall = [];
+            $changed = true;
+        }
+
+        if (! isset($decoded['scripts']) || ! is_array($decoded['scripts'])) {
+            $decoded['scripts'] = [];
+            $changed = true;
+        }
+
         // Inject preferred-install so Composer checks out the full Git tree
         // (needed because the package manifest lives in a subfolder, not the repo root)
-        if (! isset($decoded['config']['preferred-install']['dashkit/dashkit'])) {
-            $decoded['config']['preferred-install']['dashkit/dashkit'] = 'source';
-            if (! isset($decoded['config']['preferred-install']['*'])) {
-                $decoded['config']['preferred-install']['*'] = 'dist';
+        if (! isset($preferredInstall['dashkit/dashkit'])) {
+            $preferredInstall['dashkit/dashkit'] = 'source';
+            if (! isset($preferredInstall['*'])) {
+                $preferredInstall['*'] = 'dist';
             }
             $changed = true;
         }
+
+        $decoded['config']['preferred-install'] = $preferredInstall;
 
         // Inject dashkit-sync: pulls latest commits from GitHub into vendor and refreshes autoload
         if (! isset($decoded['scripts']['dashkit-sync'])) {

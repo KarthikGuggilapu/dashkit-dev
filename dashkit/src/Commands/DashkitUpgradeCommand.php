@@ -5,6 +5,7 @@ namespace Dashkit\Commands;
 use Dashkit\Models\DashkitAuditLog;
 use Dashkit\Models\DashkitSetting;
 use Dashkit\Support\CompatibilityGuard;
+use Dashkit\Support\ProjectTraceInspector;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 use Throwable;
@@ -24,6 +25,14 @@ class DashkitUpgradeCommand extends Command
         $dryRun = (bool) $this->option('dry-run');
         $force = (bool) $this->option('force');
         $preset = $this->resolveUpgradePreset();
+
+        $strategy = $this->resolveUpgradeStrategy($files, $force);
+
+        if (! $strategy['proceed']) {
+            return self::FAILURE;
+        }
+
+        $force = $strategy['force'];
 
         $state = $this->readState($files);
         $installedVersion = (string) ($state['installed_version'] ?? '0.0.0');
@@ -107,6 +116,61 @@ class DashkitUpgradeCommand extends Command
         $this->components->info('Dashkit upgraded successfully to version '.$currentVersion.'.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * @return array{proceed: bool, force: bool}
+     */
+    private function resolveUpgradeStrategy(Filesystem $files, bool $force): array
+    {
+        $inspector = new ProjectTraceInspector($files);
+        $report = $inspector->inspect();
+
+        foreach ($inspector->summaryLines($report) as $line) {
+            $this->line($line);
+        }
+
+        if ($report['status'] === 'installed') {
+            $this->components->info('Dashkit installation traces detected. Proceeding with upgrade checks.');
+
+            return ['proceed' => true, 'force' => $force];
+        }
+
+        if ($report['status'] === 'clean') {
+            $this->components->warn('No Dashkit installation traces were found. Upgrade is not the right action for a clean project.');
+            $this->line('Recommended command: php artisan dashkit:install');
+
+            return ['proceed' => false, 'force' => false];
+        }
+
+        if ($force) {
+            $this->components->warn('Proceeding with upgrade because --force was supplied, even though only partial Dashkit traces were found.');
+
+            return ['proceed' => true, 'force' => true];
+        }
+
+        $this->components->warn('Partial Dashkit traces were found. Upgrade may work, but the project does not look like a clean installed state.');
+        $this->line('Recommended command: '.$report['recommended_command']);
+
+        if (! $this->input->isInteractive()) {
+            return ['proceed' => false, 'force' => false];
+        }
+
+        $choice = (string) $this->choice(
+            'Choose how to proceed',
+            [
+                'cancel',
+                'continue - attempt upgrade against partial traces',
+                'force - continue with overwrite behavior',
+            ],
+            'cancel'
+        );
+
+        return match ($choice) {
+            'continue - attempt upgrade against partial traces' => ['proceed' => true, 'force' => false],
+            'force - continue with overwrite behavior' => ['proceed' => true, 'force' => true],
+            default => ['proceed' => false, 'force' => false],
+        };
     }
 
     /**

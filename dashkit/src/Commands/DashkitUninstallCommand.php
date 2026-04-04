@@ -5,6 +5,7 @@ namespace Dashkit\Commands;
 use Dashkit\Models\DashkitAuditLog;
 use Dashkit\Support\ArtifactManifest;
 use Dashkit\Support\CompatibilityGuard;
+use Dashkit\Support\ProjectTraceInspector;
 use Illuminate\Console\Command;
 use Illuminate\Filesystem\Filesystem;
 
@@ -18,6 +19,23 @@ class DashkitUninstallCommand extends Command
     {
         if (! CompatibilityGuard::ensure($this)) {
             return self::FAILURE;
+        }
+
+        $inspector = new ProjectTraceInspector($files);
+        $report = $inspector->inspect();
+
+        foreach ($inspector->summaryLines($report) as $line) {
+            $this->line($line);
+        }
+
+        if ($report['status'] === 'clean') {
+            $this->components->info('No Dashkit traces were found. Nothing needs to be uninstalled.');
+
+            return self::SUCCESS;
+        }
+
+        if ($report['status'] === 'partial') {
+            $this->components->warn('Partial Dashkit traces were found. Uninstall will remove only the traces it can detect safely.');
         }
 
         $state = $this->loadInstallState($files);

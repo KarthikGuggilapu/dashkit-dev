@@ -5,7 +5,6 @@ namespace Dashkit;
 use Dashkit\Commands\DashkitAuditCommand;
 use Dashkit\Commands\DashkitDeleteModuleCommand;
 use Dashkit\Commands\DashkitDeletePageCommand;
-use Dashkit\Commands\DashkitInspectCommand;
 use Dashkit\Commands\DashkitInstallCommand;
 use Dashkit\Commands\DashkitMakeModuleCommand;
 use Dashkit\Commands\DashkitMakePageCommand;
@@ -19,9 +18,7 @@ use Dashkit\Commands\DashkitVersionCommand;
 use Dashkit\Models\DashkitSetting;
 use Dashkit\Services\WidgetRegistry;
 use Illuminate\Auth\Notifications\ResetPassword;
-use Illuminate\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
@@ -41,11 +38,11 @@ class DashkitServiceProvider extends ServiceProvider
     {
         $this->loadPackageResources();
         $this->configurePasswordResetUrl();
-        $this->registerCommands();
 
         Blade::component('dashkit::components.layout', 'dashkit-layout');
 
         if ($this->app->runningInConsole()) {
+            $this->registerCommands();
             $this->registerPublishes();
         }
 
@@ -62,8 +59,6 @@ class DashkitServiceProvider extends ServiceProvider
 
     private function loadPackageResources(): void
     {
-        $this->loadSetupRoutes();
-
         // Load routes only when Dashkit is explicitly enabled.
         if ((bool) config('dashkit.enabled', false)) {
             $this->loadRoutesFrom($this->packagePath('routes/web.php'));
@@ -74,65 +69,12 @@ class DashkitServiceProvider extends ServiceProvider
         $this->applyStoredRuntimeSettings();
     }
 
-    private function loadSetupRoutes(): void
-    {
-        if (! is_file(storage_path('app/dashkit/setup-token.json'))) {
-            return;
-        }
-
-        $this->prepareSetupRuntime();
-
-        $this->loadRoutesFrom($this->packagePath('routes/setup.php'));
-    }
-
-    private function prepareSetupRuntime(): void
-    {
-        $databasePath = storage_path('app/dashkit/setup.sqlite');
-        $filesystem = new Filesystem;
-
-        $filesystem->ensureDirectoryExists(dirname($databasePath));
-
-        if (! $filesystem->exists($databasePath)) {
-            $filesystem->put($databasePath, '');
-        }
-
-        config([
-            'database.connections.dashkit_setup' => [
-                'driver' => 'sqlite',
-                'database' => $databasePath,
-                'prefix' => '',
-                'foreign_key_constraints' => true,
-            ],
-            'session.driver' => 'database',
-            'session.connection' => 'dashkit_setup',
-            'session.table' => 'sessions',
-            'cache.default' => 'file',
-        ]);
-
-        try {
-            DB::purge('dashkit_setup');
-
-            $connection = DB::connection('dashkit_setup');
-            $connection->getPdo()->exec('CREATE TABLE IF NOT EXISTS sessions (
-                id VARCHAR(255) PRIMARY KEY,
-                user_id INTEGER NULL,
-                ip_address VARCHAR(45) NULL,
-                user_agent TEXT NULL,
-                payload TEXT NOT NULL,
-                last_activity INTEGER NOT NULL
-            )');
-        } catch (Throwable) {
-            // Avoid blocking setup route registration if SQLite setup fails unexpectedly.
-        }
-    }
-
     private function registerCommands(): void
     {
         $this->commands([
             DashkitAuditCommand::class,
             DashkitDeleteModuleCommand::class,
             DashkitDeletePageCommand::class,
-            DashkitInspectCommand::class,
             DashkitInstallCommand::class,
             DashkitMakeModuleCommand::class,
             DashkitMakePageCommand::class,

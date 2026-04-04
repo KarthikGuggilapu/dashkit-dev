@@ -1,24 +1,128 @@
-# Dashkit — Laravel Dashboard Package
+# Dashkit - Laravel Dashboard Package
 
-A lightweight dashboard engine for Laravel. Install a fully working admin dashboard — login, sidebar, pages, modules — all through simple Artisan commands.
+Dashkit is a Laravel package for bootstrapping and operating an admin dashboard inside a host Laravel application. It provides authentication screens, dashboard pages, settings screens, reusable UI components, generators, upgrade tooling, uninstall tooling, audit logging, and both CLI and browser-based installation flows.
 
-**Laravel 10 / 11 / 12** · **PHP 8.1+** · **MySQL / PostgreSQL / SQLite**
+Current package version: `1.5.2`
+
+Supported stack: Laravel 10 / 11 / 12, PHP 8.1+, MySQL / PostgreSQL / SQLite
 
 ---
 
 ## Table of Contents
 
-1. [Requirements](#requirements)
-2. [Project Setup](#project-setup)
-3. [Install Dashkit](#install-dashkit)
-4. [Presets](#presets)
-5. [Updating the Package](#updating-the-package)
-6. [Commands Reference](#commands-reference)
-7. [Generating Pages & Modules](#generating-pages--modules)
-8. [URL Structure](#url-structure)
-9. [Configuration](#configuration)
-10. [UI Components](#ui-components)
-11. [Project Structure](#project-structure)
+1. What Dashkit Is
+2. Why It Exists
+3. Core Features
+4. Package Architecture
+5. Requirements
+6. Installation Into a Host Project
+7. End-to-End Setup Flows
+8. GUI Setup Wizard
+9. Lifecycle Safety and Recovery Model
+10. What Dashkit Changes in Your Project
+11. Routes and URL Structure
+12. Configuration and Runtime Behavior
+13. Generators and Scaffolding Commands
+14. Upgrade Flow
+15. Uninstall Flow
+16. Commands Reference
+17. Troubleshooting
+18. Pros and Tradeoffs
+19. Package Structure
+20. License
+
+---
+
+## What Dashkit Is
+
+Dashkit is a package-first dashboard system for Laravel applications. Instead of hand-building an admin shell from scratch, you install Dashkit into a host app and it:
+
+- publishes its config, views, and assets
+- wires dashboard routes into the host application
+- provides login, password reset, profile, settings, and dashboard screens
+- creates preset pages for common dashboard scenarios
+- gives you page and module generators for extending the dashboard later
+- tracks what it created so upgrade and uninstall flows are safer
+
+Dashkit is not a separate standalone app. It runs inside your Laravel project and uses your app's users, environment, database, and routing context.
+
+---
+
+## Why It Exists
+
+Dashkit exists to reduce the setup cost of building an internal admin UI or dashboard shell in Laravel while still keeping the host project in control.
+
+The package is designed to solve these problems:
+
+- repeated setup of login, layout, sidebar, and default dashboard pages
+- inconsistent dashboard scaffolding between projects
+- risky manual upgrades and removals of published package files
+- hard-to-resume installs after database or environment failures
+- need for both terminal-first and browser-first onboarding flows
+
+---
+
+## Core Features
+
+Dashkit currently includes:
+
+- interactive CLI installer
+- browser-based GUI setup wizard at `/dashkit-console`
+- lifecycle-aware install, resume, reinstall, upgrade, and uninstall behavior
+- published config, views, and public assets
+- dashboard auth pages and password reset flow
+- dashboard home, settings, profile, search, and generated page routes
+- preset-based dashboard bootstrapping: `default`, `ecommerce`, `crm`
+- page generator, module generator, rename, and delete commands
+- audit logging command support
+- reusable Blade UI components
+- tracked artifact manifest for safer cleanup and rename/delete workflows
+- uninstall backups and restore-aware cleanup
+- package version and release-check tooling
+
+---
+
+## Package Architecture
+
+At a high level, Dashkit works in four layers.
+
+### 1. Service provider bootstrap
+
+`Dashkit\DashkitServiceProvider` is auto-discovered by Laravel and is responsible for:
+
+- merging `config/dashkit.php`
+- loading package views and migrations
+- conditionally loading dashboard routes
+- conditionally loading setup routes when a setup token exists
+- registering all Artisan commands
+- registering UI components and widget defaults
+- applying stored runtime settings from the database when available
+
+### 2. Host app integration
+
+During install and upgrade, Dashkit publishes and modifies host-app resources such as:
+
+- `config/dashkit.php`
+- `resources/views/vendor/dashkit`
+- `public/vendor/dashkit`
+- generated dashboard page/module files
+- `routes/web.php`
+- `.env`
+- `bootstrap/app.php` when guest redirect integration is required
+
+### 3. Setup and lifecycle engine
+
+The installer and setup wizard use a shared lifecycle-aware engine. Before acting, Dashkit inspects the project for existing traces and decides whether the correct action is install, resume, upgrade, or a manual cleanup path.
+
+### 4. Tracking and recovery
+
+Dashkit stores state under `storage/app/dashkit` so it can:
+
+- resume incomplete installs
+- track generated files and routes
+- compare upgrade state
+- remove only tracked artifacts during uninstall
+- expose setup progress inside the GUI wizard
 
 ---
 
@@ -27,104 +131,62 @@ A lightweight dashboard engine for Laravel. Install a fully working admin dashbo
 - PHP 8.1 or higher
 - Laravel 10, 11, or 12
 - MySQL, PostgreSQL, or SQLite
-- Node.js & npm
+- Node.js and npm
 
 ---
 
-## Project Setup
+## Installation Into a Host Project
 
-**Step 1 — Create a fresh Laravel project**
+### 1. Create or open a Laravel app
 
 ```bash
 composer create-project laravel/laravel my-app
 cd my-app
 ```
 
-**Step 2 — Add the Dashkit package repository**
+### 2. Add the Dashkit package source
 
-Open `composer.json` and make the following additions:
-
-**Add to `repositories`:**
+Add the package repository and requirement to the host app `composer.json`:
 
 ```json
-"repositories": [
-  {
-    "type": "package",
-    "package": {
-      "name": "dashkit/dashkit",
-      "version": "dev-dashkit-dev",
-      "source": {
-        "type": "git",
-        "url": "https://github.com/KarthikGuggilapu/dashkit-dev.git",
-        "reference": "dashkit-dev"
-      },
-      "type": "library",
-      "require": {
-        "php": "^8.2",
-        "illuminate/support": "^12.0",
-        "illuminate/routing": "^12.0",
-        "illuminate/view": "^12.0",
-        "illuminate/auth": "^12.0",
-        "illuminate/console": "^12.0"
-      },
-      "autoload": {
-        "psr-4": {
-          "Dashkit\\\\": "dashkit/src/"
-        }
-      },
-      "extra": {
-        "laravel": {
-          "providers": [
-            "Dashkit\\\\DashkitServiceProvider"
-          ]
-        }
-      }
+{
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/KarthikGuggilapu/dashkit-dev.git"
     }
+  ],
+  "require": {
+    "dashkit/dashkit": "dev-dashkit-dev"
   }
-]
+}
 ```
 
-**Add to `require`:**
+If the GitHub repository is private:
 
-```json
-"dashkit/dashkit": "dev-dashkit-dev"
+```bash
+composer config github-oauth.github.com YOUR_GITHUB_TOKEN
 ```
 
-That's all you need to add manually. The `config.preferred-install` and `scripts` (`dashkit-sync`, `dashkit-update`) are **injected automatically** into your `composer.json` when you run `php artisan dashkit:install`.
+### 3. Install dependencies
 
-> If the repository is **private**, authenticate first:
-> ```bash
-> composer config github-oauth.github.com YOUR_GITHUB_TOKEN
-> ```
-
-**Step 3 — Install dependencies**
-
-> If composer not installed, install composer with below command
 ```bash
 composer install
-```
-
-> If composer installed already, update the composer to get the package
-```bash
-composer update
-```
-
-```bash
 npm install
 ```
 
+If you are adding Dashkit into an existing project, `composer update` is also acceptable.
 
-
-**Step 4 — Set up environment**
+### 4. Prepare the Laravel environment
 
 ```bash
 cp .env.example .env
 php artisan key:generate
 ```
 
-**Step 5 — Configure your database**
+### 5. Prepare database values
 
-Open `.env` and fill in your database details or skip this for Dashkit installation:
+You can prefill the database in `.env` or let Dashkit collect it during setup:
 
 ```env
 DB_CONNECTION=mysql
@@ -135,47 +197,298 @@ DB_USERNAME=your_username
 DB_PASSWORD=your_password
 ```
 
-> **Using SQLite?** Just set `DB_CONNECTION=sqlite` — Dashkit will auto-configure the database file path during install.
+For SQLite, set `DB_CONNECTION=sqlite`. Dashkit can resolve the SQLite path during install.
 
-**Step 6 — Build assets**
+### 6. Build frontend assets
 
 ```bash
 npm run build
 ```
 
+When the installer runs, Dashkit also injects helper Composer scripts such as `dashkit-sync` and `dashkit-update` into the host project.
+
 ---
 
-## Install Dashkit
+## End-to-End Setup Flows
 
-Run the installer:
+Dashkit supports two primary install paths.
+
+### CLI setup flow
+
+Run:
 
 ```bash
 php artisan dashkit:install
 ```
 
-The installer will guide you through each step interactively:
+The CLI flow:
 
-- Publishes config, views, and assets
-- Asks for your app name, database connection, and admin credentials
-- Sets up `.env` values (mail settings are skipped — configure them later in `.env` or the dashboard)
-- Runs migrations and creates the admin user
-- Applies your chosen preset (default, ecommerce, or crm)
-- Generates default pages and sidebar navigation
-- Adds a `dashkit-update` script to your `composer.json` for easy future updates
+1. inspects the project for existing Dashkit traces
+2. decides whether the project is fresh, resumable, upgrade-ready, or leftover-heavy
+3. lets you continue in CLI or GUI mode
+4. collects app, database, admin, and preset information
+5. runs the installer step sequence
+6. stores install state and package state for later upgrade/uninstall flows
 
-**Start the server**
+CLI mode is the recommended path for:
+
+- SSH sessions
+- servers
+- CI-like scripted usage
+- debugging installer internals
+
+### GUI setup flow
+
+Choose GUI mode from `php artisan dashkit:install` when working locally.
+
+If the application is already reachable, Dashkit tries to open the default browser automatically. If not, it prints the exact URL to open manually.
+
+---
+
+## Installer Step Model
+
+Dashkit uses a 7-step guided install engine:
+
+1. `publish_config`
+2. `publish_views`
+3. `publish_assets`
+4. `route_registration`
+5. `env_setup`
+6. `post_setup`
+7. `migrate_seed`
+
+This same step model is used by:
+
+- the CLI installer
+- GUI guided install
+- resume flow after failure
+
+If the install is interrupted, continue with:
 
 ```bash
-php artisan serve
+php artisan dashkit:install --resume
 ```
 
-Visit `http://localhost:8000` — log in with the admin credentials you set during install.
+If you need to stop intentionally after a known step:
+
+```bash
+php artisan dashkit:install --stop-after=env_setup
+```
+
+---
+
+## GUI Setup Wizard
+
+The GUI setup wizard is served at `/dashkit-console` while a setup token exists.
+
+### How it is enabled
+
+GUI setup is activated by creating a setup token file at:
+
+`storage/app/dashkit/setup-token.json`
+
+When that file exists, Dashkit registers setup routes and loads the browser wizard. After setup completes, the token is removed and the wizard is no longer intended to remain open.
+
+### What the GUI does
+
+The wizard currently provides:
+
+- a 4-stage form flow: Project, Database, Admin, Review
+- test connection support before install
+- lifecycle-aware allowed actions: `install`, `resume`, `reinstall`, `upgrade`
+- a 7-step progress panel aligned with CLI installer steps
+- locked reviewed inputs after guided execution starts
+- output for the current step, last completed step, and retry guidance
+
+### Why the setup SQLite database exists
+
+Some host apps use `SESSION_DRIVER=database` before the real application database is ready. To avoid breaking the setup flow, Dashkit temporarily uses:
+
+`storage/app/dashkit/setup.sqlite`
+
+This setup database is used only so the browser installer can function safely before the main connection is ready.
+
+---
+
+## Lifecycle Safety and Recovery Model
+
+Before install, upgrade, and uninstall, Dashkit inspects the host project for traces.
+
+### Trace status values
+
+- `clean`: no traces found
+- `partial`: some traces found
+- `installed`: a full installation appears to be present
+
+### Lifecycle states
+
+- `fresh`
+- `resume-available`
+- `ready-to-upgrade`
+- `leftovers-detected`
+
+### What Dashkit inspects
+
+Dashkit checks for signals such as:
+
+- published config
+- published vendor views
+- published public assets
+- generated app views
+- installer state files
+- progress file
+- setup token
+- setup SQLite database
+- package state file with installed version
+- Dashkit route include in `routes/web.php`
+- Dashkit redirect changes in `bootstrap/app.php`
+- `DASHKIT_*` environment variables
+
+### Manual inspection
+
+```bash
+php artisan dashkit:inspect
+php artisan dashkit:inspect --json
+```
+
+The report includes:
+
+- lifecycle status
+- trace status
+- detected trace count
+- installed version when available
+- recommended action
+- recommended command
+
+### Decision guide
+
+Use this rule set:
+
+- fresh project: run `php artisan dashkit:install`
+- interrupted install: run `php artisan dashkit:install --resume`
+- installed project needing updates: run `php artisan dashkit:upgrade`
+- leftover/partial project: inspect first, then decide between resume, force install, or uninstall
+
+---
+
+## What Dashkit Changes in Your Project
+
+Dashkit modifies or creates several host-project resources.
+
+### Published package resources
+
+- `config/dashkit.php`
+- `resources/views/vendor/dashkit/`
+- `public/vendor/dashkit/`
+
+### Generated application resources
+
+- `resources/views/dashkit/pages/`
+- `resources/views/dashkit/modules/`
+- `app/Models/...` for generated modules
+- `app/Http/Controllers/Dashkit/...` for generated modules
+- module migrations
+- optional seeders such as `database/seeders/DashkitAdminSeeder.php`
+
+### Modified host files
+
+- `routes/web.php`
+- `.env`
+- `bootstrap/app.php`
+- `composer.json`
+
+### Runtime and tracking files
+
+Dashkit stores state under `storage/app/dashkit/` including:
+
+- `package-state.json`
+- `install-progress.json`
+- `install-state.json`
+- `artifacts.json`
+- `setup-token.json`
+- `setup.sqlite`
+
+### Artifact tracking
+
+Dashkit uses `artifacts.json` to track files and routes it generated. This is important for:
+
+- safer uninstall
+- rename/delete operations
+- change detection
+- avoiding blind cleanup of unrelated user files
+
+---
+
+## Routes and URL Structure
+
+Dashkit route loading is conditional.
+
+- setup routes load only while a setup token exists
+- dashboard routes load only when Dashkit is enabled in runtime config
+
+### Setup routes
+
+- `GET /dashkit-console`
+- `POST /dashkit-console/test-connection`
+- `POST /dashkit-console/install`
+
+### Auth and dashboard routes
+
+Dashkit provides routes such as:
+
+- `/login`
+- `/forgot-password`
+- `/reset-password/{token}`
+- `/logout`
+- `/`
+- `/{route_prefix}` redirect handling
+- `/{route_prefix}/search`
+- `/{route_prefix}/profile`
+- `/{route_prefix}/settings`
+- `/{route_prefix}/{page}`
+
+The default route prefix is `dashboard`, configured by `DASHKIT_ROUTE_PREFIX` or `dashkit.route_prefix`.
+
+---
+
+## Configuration and Runtime Behavior
+
+Dashkit publishes `config/dashkit.php` to the host app.
+
+Important config areas include:
+
+- package branding name
+- route prefix and route middleware
+- auth guard, login route path, logout path, redirect behavior
+- sidebar items
+- topbar behavior
+- default widgets
+- generated pages namespace and path
+- installer publish flags
+
+### Runtime settings from the database
+
+When the `dashkit_settings` table exists, Dashkit can apply stored settings at runtime for things such as:
+
+- app name
+- locale and timezone
+- mail settings
+- topbar settings
+- sidebar items
+
+This allows package-driven settings screens to influence runtime behavior.
+
+### After config changes
+
+```bash
+php artisan config:clear
+```
 
 ---
 
 ## Presets
 
-During install you choose a preset that determines which pages and sidebar links are created:
+Dashkit supports three presets.
 
 | Preset | Pages |
 |--------|-------|
@@ -183,16 +496,14 @@ During install you choose a preset that determines which pages and sidebar links
 | `ecommerce` | Overview, Products, Orders, Customers, Inventory, Reports, Settings, Profile |
 | `crm` | Overview, Leads, Contacts, Deals, Activities, Reports, Settings, Profile |
 
-```bash
-# Let the installer ask you interactively
-php artisan dashkit:install
+Install directly with a preset:
 
-# Or specify upfront
+```bash
 php artisan dashkit:install --type=ecommerce
 php artisan dashkit:install --type=crm
 ```
 
-**Switch presets any time** (without running a full install):
+Switch presets later:
 
 ```bash
 php artisan dashkit:switch-preset ecommerce
@@ -200,59 +511,135 @@ php artisan dashkit:switch-preset crm
 php artisan dashkit:switch-preset default
 ```
 
-This updates your sidebar and creates any missing pages without deleting existing ones.
+Switching a preset updates default pages and sidebar wiring without requiring a full reinstall.
 
 ---
 
-## Updating the Package
+## Generators and Scaffolding Commands
 
-### Standard update
+### Make a page
 
-Whenever a new version is available, run:
+```bash
+php artisan dashkit:make-page analytics "Analytics"
+```
+
+This creates a dashboard page view and registers its tracked route/sidebar artifact.
+
+### Make a module
+
+```bash
+php artisan dashkit:make-module invoice "Invoice"
+```
+
+This generates:
+
+- model
+- controller
+- migration
+- view directory and index view
+- route entry
+- sidebar entry
+
+### Rename generated items
+
+```bash
+php artisan dashkit:rename-page reports analytics "Analytics"
+php artisan dashkit:rename-module invoice billing "Billing"
+```
+
+### Delete generated items
+
+```bash
+php artisan dashkit:delete-page analytics
+php artisan dashkit:delete-module billing
+```
+
+These commands use tracked artifacts so route/sidebar cleanup stays aligned with what Dashkit created.
+
+---
+
+## UI Components
+
+Dashkit includes reusable Blade UI components for:
+
+- buttons
+- inputs
+- selects
+- cards
+- alerts
+- toast notifications
+- tables
+- modals
+- icons
+
+Available examples include:
+
+- `<x-dashkit::ui.button>`
+- `<x-dashkit::ui.input>`
+- `<x-dashkit::ui.select>`
+- `<x-dashkit::ui.card>`
+- `<x-dashkit::ui.alert>`
+- `<x-dashkit::ui.toast>`
+- `<x-dashkit::ui.table>`
+- `<x-dashkit::ui.modal>`
+- `<x-dashkit::ui.icon>`
+
+Example:
+
+```blade
+<x-dashkit::ui.card title="Orders" description="Reusable Dashkit components in action">
+    <x-dashkit::ui.alert tone="info" message="This module uses shared UI primitives." />
+
+    <div class="mt-4 flex gap-2">
+        <x-dashkit::ui.button>Primary</x-dashkit::ui.button>
+        <x-dashkit::ui.button variant="secondary">Secondary</x-dashkit::ui.button>
+    </div>
+</x-dashkit::ui.card>
+```
+
+---
+
+## Upgrade Flow
+
+Normal upgrade path:
 
 ```bash
 composer run dashkit-update
 ```
 
-This runs two steps in one:
-1. Pulls latest commits from GitHub via `dashkit-sync`
-2. Applies config, view, and asset updates via `php artisan dashkit:upgrade`
+That flow is intended to:
 
-**Your customised views are never overwritten automatically.** Use `--force` only when you want a full UI reset:
+1. sync package code
+2. run `php artisan dashkit:upgrade`
+
+You can also run the upgrade command directly:
 
 ```bash
+php artisan dashkit:upgrade
+php artisan dashkit:upgrade --dry-run
 php artisan dashkit:upgrade --force
+php artisan dashkit:upgrade --type=crm
 ```
 
----
+Upgrade behavior includes:
 
-### Daily update flow after new Git commits
+- lifecycle checks before applying changes
+- package version comparison
+- fingerprint comparison when version numbers did not change
+- publishing config, views, and assets
+- ensuring route include and default pages
+- running migrations
+- clearing config and view caches
+- updating stored package state
 
-Whenever package code is updated on branch `dashkit-dev`, run:
+If Composer-based syncing is stale in a subfolder workflow:
 
 ```bash
 composer run-script dashkit-sync
-php artisan dashkit:upgrade --type=crm --force
+php artisan dashkit:upgrade
 ```
 
----
-
-### Why not just `composer update`?
-
-With this setup (package manifest inside a subfolder), Composer may show `Nothing to modify` even when new branch commits exist. `dashkit-sync` solves that by directly pulling the latest commits into `vendor/dashkit/dashkit` and refreshing autoload and package discovery.
-
----
-
-### Troubleshooting
-
-**Sync fails with _source checkout not found_:**
-
-```bash
-composer install
-composer run-script dashkit-sync
-```
-
-**New classes or commands not detected after sync:**
+If autoload or package discovery looks stale:
 
 ```bash
 composer dump-autoload
@@ -261,146 +648,192 @@ php artisan package:discover --ansi
 
 ---
 
+## Uninstall Flow
+
+Dashkit uninstall is designed to be safer than manual file deletion.
+
+Run:
+
+```bash
+php artisan dashkit:uninstall
+```
+
+Or run non-interactively:
+
+```bash
+php artisan dashkit:uninstall --yes
+php artisan dashkit:uninstall --yes --backup
+```
+
+The uninstall process previews what it will remove, including tracked files and tracked routes.
+
+Uninstall steps include:
+
+1. restore installer-tracked file changes
+2. remove `config/dashkit.php`
+3. remove published vendor views
+4. remove public assets
+5. remove generated dashboard pages
+6. remove Dashkit route include
+7. remove tracked generated files and routes
+8. remove default Dashkit routes from `routes/web.php`
+9. remove bootstrap/provider modifications
+10. remove `DASHKIT_*` environment variables
+11. remove Dashkit state and cache files
+
+When backup mode is used, Dashkit stores backups under `storage/app/dashkit/uninstall-backups`.
+
+---
+
 ## Commands Reference
+
+### Install, lifecycle, and maintenance
 
 | Command | Description |
 |---------|-------------|
-| `php artisan dashkit:install` | Full install — interactive setup from scratch |
-| `php artisan dashkit:install --resume` | Resume an interrupted install |
-| `php artisan dashkit:install --type=ecommerce` | Install with a specific preset |
-| `php artisan dashkit:install --force` | Overwrite already published files |
-| `php artisan dashkit:upgrade` | Apply latest package changes to an installed app |
-| `php artisan dashkit:upgrade --dry-run` | Preview what upgrade will change |
-| `php artisan dashkit:version` | Show current package version, installed version, and update status |
-| `php artisan dashkit:upgrade --type=crm` | Upgrade and switch preset at the same time |
-| `php artisan dashkit:switch-preset {type}` | Switch preset without a full upgrade |
-| `php artisan dashkit:make-page {name} {title}` | Generate a new dashboard page |
-| `php artisan dashkit:make-module {name} {title}` | Generate a new module with model, controller, migration |
-| `php artisan dashkit:uninstall` | Remove Dashkit with confirmation prompt |
-| `php artisan dashkit:uninstall --yes` | Remove without confirmation |
-| `php artisan dashkit:uninstall --backup` | Backup files before removing |
-| `composer run dashkit-update` | Pull latest package + run upgrade (one command) |
+| `php artisan dashkit:install` | Start a new install with CLI or GUI selection |
+| `php artisan dashkit:install --resume` | Continue an interrupted install |
+| `php artisan dashkit:install --force` | Reinstall intentionally and overwrite published files |
+| `php artisan dashkit:install --type=crm` | Install with a specific preset |
+| `php artisan dashkit:install --stop-after=env_setup` | Stop after a specific step |
+| `php artisan dashkit:inspect` | Inspect lifecycle and traces |
+| `php artisan dashkit:inspect --json` | Return trace report as JSON |
+| `php artisan dashkit:upgrade` | Upgrade an installed Dashkit project |
+| `php artisan dashkit:upgrade --dry-run` | Preview upgrade work only |
+| `php artisan dashkit:upgrade --force` | Force upgrade behavior and overwrite published files |
+| `php artisan dashkit:uninstall` | Uninstall with confirmation |
+| `php artisan dashkit:uninstall --yes` | Uninstall without prompt |
+| `php artisan dashkit:uninstall --backup` | Keep a backup before uninstall |
+| `php artisan dashkit:version` | Show package and installed versions |
+| `php artisan dashkit:version --json` | Show versions as JSON |
+| `php artisan dashkit:release-check` | Recommend a version bump for package changes |
+| `composer run dashkit-update` | Sync and upgrade in one command |
+
+### Presets, generators, and cleanup
+
+| Command | Description |
+|---------|-------------|
+| `php artisan dashkit:switch-preset {type}` | Switch the default preset |
+| `php artisan dashkit:make-page {name} {title?}` | Generate a dashboard page |
+| `php artisan dashkit:make-module {name} {title?}` | Generate a dashboard module |
+| `php artisan dashkit:rename-page {from} {to} {title?}` | Rename a generated page and keep tracking aligned |
+| `php artisan dashkit:rename-module {from} {to} {title?}` | Rename a generated module and keep tracking aligned |
+| `php artisan dashkit:delete-page {name}` | Delete a generated page |
+| `php artisan dashkit:delete-module {module}` | Delete a generated module |
+| `php artisan dashkit:audit` | View Dashkit audit log events |
+
+### Audit command filters
+
+`dashkit:audit` supports filters such as:
+
+- `--action=`
+- `--actor=`
+- `--target=`
+- `--from=`
+- `--to=`
+- `--limit=`
 
 ---
 
-## Generating Pages & Modules
+## Troubleshooting
 
-**Create a new page:**
+### GUI wizard does not open automatically
+
+If the browser does not open automatically, start your Laravel app first and then open the printed `/dashkit-console?...` URL manually.
+
+### GUI route returns 404
+
+The setup wizard only exists while `storage/app/dashkit/setup-token.json` exists. If the token was removed or setup completed, the route is not supposed to remain available.
+
+### Database-backed sessions break setup before the main DB exists
+
+Dashkit works around this by using `storage/app/dashkit/setup.sqlite` during GUI setup. If setup still fails, verify the storage path is writable.
+
+### Install stopped midway
+
+Use:
 
 ```bash
-php artisan dashkit:make-page analytics "Analytics"
+php artisan dashkit:install --resume
 ```
 
-- Creates `resources/views/dashkit/pages/analytics.blade.php`
-- Registers route at `/dashboard/analytics`
-- Adds a sidebar entry in `config/dashkit.php`
-
-**Create a module** (page + model + controller + migration):
+If the project state is confused, inspect first:
 
 ```bash
-php artisan dashkit:make-module invoice "Invoice"
+php artisan dashkit:inspect
 ```
 
-- Creates `resources/views/dashkit/modules/invoice/index.blade.php`
-- Creates `app/Models/Invoice.php`
-- Creates `app/Http/Controllers/Dashkit/InvoiceController.php`
-- Creates a migration for the `invoices` table
-- Registers route at `/dashboard/invoice`
-- Adds a sidebar entry in `config/dashkit.php`
+### Upgrade says the project is clean or partial
 
----
+That means Dashkit does not trust the current state as a valid installed package state. Inspect traces first, then choose between upgrade, force install, or uninstall.
 
-## URL Structure
+### Published views are not matching package views
 
-| URL | Page |
-|-----|------|
-| `/` | Dashboard home (overview) |
-| `/login` | Login page |
-| `/logout` | Logs out, redirects to `/login` |
-| `/dashboard/{slug}` | Any page or module |
+Remember that published views in `resources/views/vendor/dashkit` override package views. If you changed the package copy but the app still renders old markup, check the published override first.
 
----
+### Commands or classes are not discovered after sync
 
-## Configuration
-
-After install, `config/dashkit.php` is published to your app. Edit it to customise the dashboard:
-
-```php
-// config/dashkit.php
-
-'app_name' => 'My Dashboard',
-
-'sidebar' => [
-    ['title' => 'Overview',  'slug' => 'overview',  'icon' => 'home'],
-    ['title' => 'Analytics', 'slug' => 'analytics', 'icon' => 'bar-chart'],
-    ['title' => 'Settings',  'slug' => 'settings',  'icon' => 'settings'],
-],
-
-'topbar' => [
-    'enabled' => true,
-],
-```
-
-After editing config, clear the cache:
+Run:
 
 ```bash
-php artisan config:clear
+composer dump-autoload
+php artisan package:discover --ansi
 ```
 
 ---
 
-## UI Components
+## Pros and Tradeoffs
 
-Dashkit now includes reusable Blade UI components so generated and package views can share the same design system.
+### Advantages
 
-Use these in your views:
+- very fast dashboard bootstrap inside a standard Laravel project
+- both CLI and GUI onboarding paths
+- lifecycle-aware install, upgrade, and uninstall flows
+- safer artifact tracking than ad hoc file publishing alone
+- page/module generation reduces repetitive dashboard work
+- package settings can influence runtime behavior
 
-- `<x-dashkit::ui.button>` for actions
-- `<x-dashkit::ui.input>` for text/email/password/number fields
-- `<x-dashkit::ui.select>` for dropdowns
-- `<x-dashkit::ui.card>` for page sections
-- `<x-dashkit::ui.alert>` for inline feedback
-- `<x-dashkit::ui.toast>` for temporary notifications
-- `<x-dashkit::ui.table>` for tabular lists
-- `<x-dashkit::ui.modal>` for dialog boxes
-- `<x-dashkit::ui.icon>` for Hero-style SVG icons and Font Awesome icons
+### Tradeoffs
 
-Icon examples:
+- host-project files are modified, so package ownership must be understood clearly
+- published vendor views can drift from package views over time
+- setup and uninstall rely on tracking files under `storage/app/dashkit`
+- upgrade behavior is safer than blind publishing, but still requires discipline when the host app has customized generated artifacts
+- the GUI setup flow is primarily optimized for local/developer environments, not headless production deployment
 
-```blade
-<x-dashkit::ui.icon name="mail" class="text-cyan-600" />
-<x-dashkit::ui.icon name="copy" lib="fa" class="text-slate-500" />
-```
+---
 
-Preset-friendly semantic names are supported in `hero` mode as aliases:
+## Package Structure
 
-- Default: `home`, `reports`, `settings`, `profile`
-- Ecommerce: `products`, `orders`, `customers`, `inventory`
-- CRM: `leads`, `contacts`, `deals`, `activities`
-- Common app: `search`, `bell`, `calendar`, `tasks`, `wallet`, `shield`, `support`, `login`, `logout`
+Key package directories:
 
-If a `hero` icon name is not in the built-in SVG set, Dashkit automatically falls back to Font Awesome (`fa-solid`) using the same name.
+- `config/`
+- `database/migrations/`
+- `resources/views/auth/`
+- `resources/views/components/`
+- `resources/views/setup/`
+- `routes/web.php`
+- `routes/setup.php`
+- `src/Commands/`
+- `src/Http/Controllers/`
+- `src/Support/`
 
-Dashkit layout/auth screens include Font Awesome CDN for quick icon usage.
+Important command classes include:
 
-Example:
+- install, inspect, upgrade, uninstall
+- version and release-check
+- preset switch
+- page/module make, rename, and delete
+- audit log inspection
 
-```blade
-<x-dashkit::ui.card title="Orders" description="Reusable Dashkit components in action">
-  <x-dashkit::ui.alert tone="info" message="This module uses shared UI primitives." />
+Important migrations include:
 
-  <div class="mt-4 flex gap-2">
-    <x-dashkit::ui.button>Primary</x-dashkit::ui.button>
-    <x-dashkit::ui.button variant="secondary">Secondary</x-dashkit::ui.button>
-  </div>
-</x-dashkit::ui.card>
-```
-
-All newly generated pages/modules now start with these components by default.
+- `dashkit_settings`
+- `dashkit_user_preferences`
+- `dashkit_audit_logs`
 
 ---
 
 ## License
 
 MIT
-
